@@ -1,6 +1,7 @@
 // author: Nolan <sullen.goose@gmail.com>
 // Copy if you can.
 
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -38,7 +39,7 @@ static size_t read_string_lexeme(const char * json, struct jsonLexemeData * data
                 data->end = json++;
                 data->measured_length = measured_length + 1; 
                 return json - begin;
-            case '\\': measured_length++; state = S_ESCAPE; break;
+            case '\\': state = S_ESCAPE; break;
             default:   measured_length++; state = S_NEXT_CHAR + bytes_left; break;
             }
             ++json;
@@ -58,14 +59,16 @@ static size_t read_string_lexeme(const char * json, struct jsonLexemeData * data
             switch (*json) {
             case '\\': case '"': case '/': case 'b':
             case 'f':  case 'n': case 'r': case 't': 
+                ++measured_length;
                 ++json; 
                 break;
             case 'u': 
-                measured_length += 8;
+                measured_length += 4;
                 for (int i = 0; i < 4; ++i) if (!isxdigit(*++json)) return 0;
                 break;
             default: return 0;
             }
+            state = S_NEXT_CHAR;
             break;
         default: exit(1); // unreachable statement
         }

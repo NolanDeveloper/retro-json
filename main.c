@@ -81,7 +81,7 @@ int main() {
         set_field_object, set_field_array, set_field_string, set_field_number, 
         set_field_bool, set_field_null, array_add_object, array_add_array, 
         array_add_string, array_add_number, array_add_bool, array_add_null);
-    const char * json = "{ \"\\u042F \\u043C\\u043E\\u0436\\u0443 \\u0457\\u0441\\u0442\" : -42E-5 }";
+    const char * json = "{ \"\\u042F \\u043C\\u043E\\u0436\\u0443 \\u0457\\u0441\\u0442\" : \"-42E-5\" }";
     if (!json_parse(json)) return 1;
     return 0;
 }

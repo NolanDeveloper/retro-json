@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#include <stdio.h>
+
 #include "lexer.h"
 #include "parser.h"
 

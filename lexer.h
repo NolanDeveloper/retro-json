@@ -27,4 +27,4 @@ struct jsonLexemeData {
 
 enum jsonLexemeKind json_next_lexeme(const char * json, struct jsonLexemeData * data);
 
-int json_get_string(const char * json, char * out);
+size_t json_get_string(const char * json, char * out);

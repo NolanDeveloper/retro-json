@@ -36,8 +36,8 @@ static size_t read_string_lexeme(const char * json, struct jsonLexemeData * data
             switch (*json) {
             case '\"': 
                 data->end = json++;
-                data->measured_length = measured_length; 
-                return json - begin + 1;
+                data->measured_length = measured_length + 1; 
+                return json - begin;
             case '\\': measured_length++; state = S_ESCAPE; break;
             default:   measured_length++; state = S_NEXT_CHAR + bytes_left; break;
             }
@@ -52,15 +52,16 @@ static size_t read_string_lexeme(const char * json, struct jsonLexemeData * data
         case S_ONE_LEFT:   
             if (*(unsigned char *)(json++) >> 6 != 0x2) return 0;
             ++measured_length;
+            state = S_NEXT_CHAR;
             break;
         case S_ESCAPE:
-            state = S_NEXT_CHAR;
             switch (*json) {
             case '\\': case '"': case '/': case 'b':
             case 'f':  case 'n': case 'r': case 't': 
                 ++json; 
                 break;
             case 'u': 
+                measured_length += 8;
                 for (int i = 0; i < 4; ++i) if (!isxdigit(*++json)) return 0;
                 break;
             default: return 0;
@@ -83,7 +84,11 @@ static size_t read_number_lexeme(const char * json, struct jsonLexemeData * data
         ++json;
         while (isdigit(*json++));
     }
-    if ('e' != *json && 'E' != *json) return json - begin;
+    if ('e' != *json && 'E' != *json) {
+        data->begin = begin;
+        data->end = json;
+        return json - begin;
+    }
     ++json;
     if ('+' == *json || '-' == *json) ++json;
     while (isdigit(*json++));
@@ -99,7 +104,8 @@ static size_t read_number_lexeme(const char * json, struct jsonLexemeData * data
         if (strcmp((w), json)) return JS_ERROR; \
         data->bytes_read = ws + sizeof(w); \
         return (k);
-extern enum jsonLexemeKind next_lexeme(const char * json, struct jsonLexemeData * data) {
+extern enum jsonLexemeKind json_next_lexeme(
+        const char * json, struct jsonLexemeData * data) {
     const char * begin = json;
     size_t ws; 
     size_t t;
@@ -142,12 +148,12 @@ static size_t put_utf8_code_point(int32_t hex, char * out) {
     } else {
         *out++ = 0xe0 | hex >> 12;
         *out++ = 0x80 | ((hex >> 6) & 0x3f);
-        *out++ = 0x80 | (hex & 0x3f);
+        *out   = 0x80 | (hex & 0x3f);
         return 3;
     } 
 }
 
-extern int get_string(const char * json, char * out) {
+extern int json_get_string(const char * json, char * out) {
     enum State { 
         S_NEXT_CHAR, S_ONE_LEFT, S_TWO_LEFT, S_THREE_LEFT, S_ESCAPE
     }; 
@@ -158,9 +164,9 @@ extern int get_string(const char * json, char * out) {
         switch (state) {
         case S_NEXT_CHAR: 
             bytes_left = utf8_bytes_left[*(unsigned char *)json];
-            if (-1 == bytes_left) return 1;
+            if (-1 == bytes_left) return 0;
             switch (*json) {
-            case '\"': *out = '\0'; return 0;
+            case '\"': *out = '\0'; return 1;
             case '\\': state = S_ESCAPE; json++; break;
             default:   
                 state = S_NEXT_CHAR + bytes_left; 
@@ -169,14 +175,15 @@ extern int get_string(const char * json, char * out) {
             }
             break;
         case S_THREE_LEFT: 
-            if (*(unsigned char *)(json++) >> 6 != 0x2) return 0;
+            if (*(unsigned char *)(json) >> 6 != 0x2) return 1;
             *out++ = *json++;
         case S_TWO_LEFT:   
-            if (*(unsigned char *)(json++) >> 6 != 0x2) return 0;
+            if (*(unsigned char *)(json) >> 6 != 0x2) return 1;
             *out++ = *json++;
         case S_ONE_LEFT:   
-            if (*(unsigned char *)(json++) >> 6 != 0x2) return 0;
+            if (*(unsigned char *)(json) >> 6 != 0x2) return 1;
             *out++ = *json++;
+            state = S_NEXT_CHAR;
             break;
         case S_ESCAPE:
             state = S_NEXT_CHAR;
@@ -193,7 +200,7 @@ extern int get_string(const char * json, char * out) {
                 hex = 0;
                 for (int i = 0; i < 4; ++i) {
                     char c = *json++;
-                    if (!isxdigit(c)) return 0;
+                    if (!isxdigit(c)) return 1;
                     hex <<= 4;
                          if (c < 'A') hex |= c - '0';
                     else if (c < 'a') hex |= c - 'A' + 10;
@@ -201,7 +208,7 @@ extern int get_string(const char * json, char * out) {
                 }
                 out += put_utf8_code_point(hex, out);
                 break;
-            default: return 0;
+            default: return 1;
             }
             break;
         default: exit(1); // unreachable statement

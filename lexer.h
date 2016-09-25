@@ -25,8 +25,6 @@ struct jsonLexemeData {
     size_t measured_length; //  - set for string
 };
 
-enum jsonLexemeKind next_lexeme(const char * json, struct jsonLexemeData * data);
+enum jsonLexemeKind json_next_lexeme(const char * json, struct jsonLexemeData * data);
 
-// 0 - OK
-// 1 - FAIL
-int get_string(const char * json, char * out);
+int json_get_string(const char * json, char * out);

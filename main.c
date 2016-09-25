@@ -1,38 +1,88 @@
+// author: Nolan <sullen.goose@gmail.com>
+// Copy if you can.
+
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "lexer.h"
+#include "parser.h"
+
+int create_object() { 
+    static int n = 0;
+    printf("object: %d\n", n);
+    return n++;
+}
+
+int create_array() { 
+    static int n = 0;
+    printf("array: %d\n", n);
+    return n++;
+}
+
+int create_field(int object, char * name) { 
+    static int n = 0;
+    printf("field(%d, %s): %d\n", object, name, n);
+    return n++;
+}
+
+char * alloc_string(size_t length) {
+    return malloc(length);
+}
+
+void set_field_object(int field, int object) { 
+    printf("set_field_object(%d, %d)\n", field, object);
+}
+
+void set_field_array(int field, int array) {
+    printf("set_field_array(%d, %d)\n", field, array);
+}
+
+void set_field_string(int field, char * string) {
+    printf("set_field_string(%d, %s)\n", field, string);
+}
+
+void set_field_number(int field, double value) {
+    printf("set_field_number(%d, %lf)\n", field, value);
+}
+
+void set_field_bool(int field, int value) {
+    printf("set_field_bool(%d, %s)\n", field, value ? "true" : "false");
+}
+
+void set_field_null(int field) { 
+    printf("set_field_null(%d)\n", field);
+}
+
+void array_add_object(int array, int object) {
+    printf("array_add_object(%d, %d)\n", array, object);
+}
+
+void array_add_array(int array_container, int array_value) {
+    printf("array_add_array(%d, %d)\n", array_container, array_value);
+}
+
+void array_add_string(int array, char * string) {
+    printf("array_add_string(%d, %s)\n", array, string);
+}
+
+void array_add_number(int array, double value) {
+    printf("array_add_number(%d, %lf)\n", array, value);
+}
+
+void array_add_bool(int array, int value) {
+    printf("array_add_bool(%d, %s)\n", array, value ? "true" : "false");
+}
+
+void array_add_null(int array) {
+    printf("array_add_null(%d)\n", array);
+}
 
 int main() {
-    const char * json = "{ \"string\\u2600\" : -42.e4 }";
-    struct jsonLexemeData lexeme_data;
-    char * actual;
-    while (*json) {
-        switch (next_lexeme(json, &lexeme_data)) {
-        case JS_ERROR:            printf("error\n"); return 1;
-        case JS_L_BRACE:          printf("{\n"); break;
-        case JS_R_BRACE:          printf("}\n"); break;
-        case JS_L_SQUARE_BRACKET: printf("[\n"); break;
-        case JS_R_SQUARE_BRACKET: printf("]\n"); break;
-        case JS_COMMA:            printf(",\n"); break;
-        case JS_COLON:            printf(":\n"); break;
-        case JS_TRUE:             printf("true\n"); break;
-        case JS_FALSE:            printf("false\n"); break;
-        case JS_NULL:             printf("null\n"); break;
-        case JS_STRING:           
-            actual = malloc(lexeme_data.measured_length);
-            if (get_string(lexeme_data.begin, actual)) {
-                printf("Ooops\n");
-                break;
-            }
-            printf("string: \"%s\"\n", actual);
-            break;
-        case JS_NUMBER:           printf("number: %.*s\n",
-                                          lexeme_data.end - lexeme_data.begin, 
-                                          lexeme_data.begin); break;
-        default: return 1;
-        }
-        json += lexeme_data.bytes_read;
-    }
+    json_set_callbacks(create_object, create_array, create_field, alloc_string,
+        set_field_object, set_field_array, set_field_string, set_field_number, 
+        set_field_bool, set_field_null, array_add_object, array_add_array, 
+        array_add_string, array_add_number, array_add_bool, array_add_null);
+    const char * json = "{ \"\u14C2\u1546\u152D\u154C\u1593\u1483\u146F" 
+        "\u14F1\u154B\u1671\u1466\u1450\u14D0\u14C7\u1585\u1450\u1593\" : -42E-5 }";
+    if (!json_parse(json)) return 1;
     return 0;
 }

@@ -1,8 +1,6 @@
 // author: Nolan <sullen.goose@gmail.com>
 // Copy if you can.
 
-#include <stdio.h>
-
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -192,7 +190,6 @@ extern int get_string(const char * json, char * out) {
             case  'r': *out++ = '\r'; break;
             case  't': *out++ = '\t'; break;
             case  'u':
-                       puts("here\n");
                 hex = 0;
                 for (int i = 0; i < 4; ++i) {
                     char c = *json++;

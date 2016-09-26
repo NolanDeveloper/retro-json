@@ -45,7 +45,7 @@ static size_t read_string_lexeme(const char * json, struct jsonLexemeData * data
             if (-1 == bytes_left) return 0;
             switch (*json) {
             case '\"': 
-                data->end = json++;
+                ++json;
                 data->measured_length = measured_length + 1; 
                 return json - begin;
             case '\\': state = S_ESCAPE; break;
@@ -97,39 +97,40 @@ static size_t read_number_lexeme(const char * json, struct jsonLexemeData * data
          if ('0' == *json) ++json;
     else if ('1' <= *json && *json <= '9') {
         ++json;
-        while (isdigit(*json++));
+        while (isdigit(*json)) ++json;
     } else return 0;
     if ('.' == *json) {
         ++json;
-        while (isdigit(*json++));
+        while (isdigit(*json)) ++json;
     }
     if ('e' != *json && 'E' != *json) {
         data->begin = begin;
-        data->end = json;
         return json - begin;
     }
     ++json;
     if ('+' == *json || '-' == *json) ++json;
-    while (isdigit(*json++));
+    while (isdigit(*json)) ++json;
     data->begin = begin;
-    data->end = json;
     return json - begin;
 }
 
+static int is_prefix(const char * prefix, const char * str) {
+    while (*prefix && *str && *prefix++ == *str++);
+    return !!*prefix;
+}
+
 #define SINGLE_CHAR_LEXEME(c, k) \
-    case c: data->bytes_read = ws + 1; return k;
+    case c: data->bytes_read = json + 1 - begin; return k;
 #define CONCRETE_WORD_LEXEME(c, w, k) \
     case (c):  \
-        if (strcmp((w), json)) return JS_ERROR; \
-        data->bytes_read = ws + sizeof(w); \
+        if (is_prefix((w), json)) return JS_ERROR; \
+        data->bytes_read = json - begin + sizeof(w) - 1; \
         return (k);
 extern enum jsonLexemeKind json_next_lexeme(
         const char * json, struct jsonLexemeData * data) {
     const char * begin = json;
-    size_t ws; 
     size_t t;
     while (isspace(*json)) ++json;
-    ws = json - begin;
     switch (*json) {
     case '\0': return JS_ERROR;
     SINGLE_CHAR_LEXEME('{', JS_L_BRACE)
@@ -144,12 +145,14 @@ extern enum jsonLexemeKind json_next_lexeme(
     case '\"': 
         t = read_string_lexeme(json, data); 
         if (!t) return JS_ERROR;
-        data->bytes_read = ws + t;
+        json += t;
+        data->bytes_read = json - begin;
         return JS_STRING;
     default:
         t = read_number_lexeme(json, data); 
         if (!t) return JS_ERROR;
-        data->bytes_read = ws + t;
+        json += t;
+        data->bytes_read = json - begin;
         return JS_NUMBER;
     }
 }

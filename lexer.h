@@ -19,9 +19,7 @@ enum jsonLexemeKind {
 struct jsonLexemeData {
     size_t bytes_read;      //  - set for all
     const char * begin;     //  - set for JS_STRING and JS_NUMBER
-    const char * end;       // for JS_STRING 
-                            // begin points to first char inside quotes
-                            // end points to ending quote
+                            // for JS_STRING begin points to first char inside quotes
     size_t measured_length; //  - set for string
 };
 

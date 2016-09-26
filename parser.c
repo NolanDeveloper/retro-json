@@ -3,229 +3,245 @@
 
 #include <stddef.h>
 #include <stdlib.h>
-
-#include <stdio.h>
+#include <inttypes.h>
+#include <string.h>
 
 #include "lexer.h"
 #include "parser.h"
 
-static json_create_object_f create_object;
-static json_create_array_f create_array;
-static json_create_field_f create_field;
-static json_alloc_string_f alloc_string;
-static json_set_field_object_f set_field_object;
-static json_set_field_array_f set_field_array;
-static json_set_field_string_f set_field_string;
-static json_set_field_number_f set_field_number;
-static json_set_field_bool_f set_field_bool;
-static json_set_field_null_f set_field_null;
-static json_array_add_object_f array_add_object;
-static json_array_add_array_f array_add_array;
-static json_array_add_string_f array_add_string;
-static json_array_add_number_f array_add_number;
-static json_array_add_bool_f array_add_bool;
-static json_array_add_null_f array_add_null;
+static struct jsonLexemeData lexeme_data;
 
-void json_set_callbacks(
-    json_create_object_f    json_create_object,
-    json_create_array_f     json_create_array,
-    json_create_field_f     json_create_field,
-    json_alloc_string_f     json_alloc_string,
-    json_set_field_object_f json_set_field_object,
-    json_set_field_array_f  json_set_field_array,
-    json_set_field_string_f json_set_field_string,
-    json_set_field_number_f json_set_field_number,
-    json_set_field_bool_f   json_set_field_bool,
-    json_set_field_null_f   json_set_field_null,
-    json_array_add_object_f json_array_add_object,
-    json_array_add_array_f  json_array_add_array,
-    json_array_add_string_f json_array_add_string,
-    json_array_add_number_f json_array_add_number,
-    json_array_add_bool_f   json_array_add_bool,
-    json_array_add_null_f   json_array_add_null) {
-    create_object    = json_create_object;
-    create_array     = json_create_array;
-    create_field     = json_create_field;
-    alloc_string     = json_alloc_string;
-    set_field_object = json_set_field_object;
-    set_field_array  = json_set_field_array;
-    set_field_string = json_set_field_string;
-    set_field_number = json_set_field_number;
-    set_field_bool   = json_set_field_bool;
-    set_field_null   = json_set_field_null;
-    array_add_object = json_array_add_object;
-    array_add_array  = json_array_add_array;
-    array_add_string = json_array_add_string;
-    array_add_number = json_array_add_number;
-    array_add_bool   = json_array_add_bool;
-    array_add_null   = json_array_add_null;
+static size_t hash(unsigned char * str) {
+    size_t hash = 5381;
+    size_t c;
+    while ((c = *str++)) hash = ((hash << 5) + hash) + c;
+    return hash;
 }
 
-static size_t json_parse_field_value(const char * json, int field);
+static int json_object_grow(struct jsonObject * object);
 
-static size_t json_parse_object(const char * json, int object) {
+static void json_object_add_pair(struct jsonObject * object, char * name, 
+        struct jsonValue value) {
+    if ((double) object->size / object->capacity > 0.75) {
+        json_object_grow(object);
+    }
+    size_t h = hash((unsigned char *) name) % object->capacity;
+    while (object->buckets[h].name) h = (h + 1) % object->capacity;
+    object->buckets[h].name = name;
+    object->buckets[h].value = value;
+    ++object->size;
+}
+
+static int json_object_grow(struct jsonObject * object) {
+    size_t old_capacity = object->capacity;
+    struct jsonPair * old_buckets = object->buckets;
+    size_t i;
+    object->size = 0;
+    object->capacity *= 2;
+    object->buckets = json_malloc(object->capacity * sizeof(struct jsonPair));
+    if (!object->buckets) return 0;
+    memset(object->buckets, 0, object->capacity * sizeof(struct jsonPair));
+    for (i = 0; i < old_capacity; ++i) {
+        if (!old_buckets[i].name) continue;
+        json_object_add_pair(object, old_buckets[i].name, old_buckets[i].value);
+    }
+    return 1;
+}
+
+static struct jsonObject * json_object_create(size_t initial_capacity) {
+    struct jsonObject * object = json_malloc(sizeof(struct jsonObject));
+    if (!object) return 0;
+    object->capacity = initial_capacity;
+    object->size = 0;
+    if (initial_capacity) {
+        object->buckets = json_malloc(initial_capacity * sizeof(struct jsonPair));
+        return object->buckets ? object : 0;
+    } 
+    object->buckets = NULL;
+    return object;
+}
+
+static void json_object_free(struct jsonObject * object) {
+    size_t i;
+    if (object->buckets) {
+        for (i = 0; i < object->capacity; ++i) {
+            if (!object->buckets[i].name) continue;
+            json_free(object->buckets[i].name);
+            json_value_free(object->buckets[i].value);
+        }
+        json_free(object->buckets);
+    }
+    json_free(object);
+}
+
+// '{' was read
+static size_t json_parse_object(const char * json, struct jsonObject ** object) {
     const char * begin = json;
-    struct jsonLexemeData data;
-    enum jsonLexemeKind kind;
-    char * str;
-    int field;
+    char * name;
+    struct jsonValue value;
+    enum jsonLexemeKind kind = json_next_lexeme(json, &lexeme_data);
     size_t bytes_read;
-    if (JS_L_BRACE != json_next_lexeme(json, &data)) return 0;
-    json += data.bytes_read;
-    kind = json_next_lexeme(json, &data);
-    json += data.bytes_read;
-    if (JS_R_BRACE == kind) return json - begin;
+    json += lexeme_data.bytes_read;
+    if (kind == JS_R_BRACE) {
+        *object = json_object_create(0);
+        return lexeme_data.bytes_read;
+    }
+    *object = json_object_create(10);
     while (1) {
-        if (JS_STRING != kind) return 0;
-        str = alloc_string(data.measured_length);
-        if (!str || !json_get_string(data.begin, str)) return 0;
-        field = create_field(object, str);
-        if (JS_COLON != json_next_lexeme(json, &data)) return 0;
-        json += data.bytes_read;
-        bytes_read = json_parse_field_value(json, field);
-        if (!bytes_read) return 0;
+        if (JS_STRING != kind) goto fail;
+        name = json_malloc(lexeme_data.measured_length);
+        if (!name) goto fail;
+        if (!json_get_string(lexeme_data.begin, name)) goto fail;
+        if (JS_COLON != json_next_lexeme(json, &lexeme_data)) goto fail;
+        json += lexeme_data.bytes_read;
+        bytes_read = json_parse_value(json, &value);
+        if (!bytes_read) goto fail;
         json += bytes_read;
-        kind = json_next_lexeme(json, &data);
-        json += data.bytes_read;
-        if (JS_R_BRACE == kind) return json - begin;
-        if (JS_COMMA != kind) return 0;
-        kind = json_next_lexeme(json, &data);
-        json += data.bytes_read;
+        json_object_add_pair(*object, name, value);
+        kind = json_next_lexeme(json, &lexeme_data);
+        json += lexeme_data.bytes_read;
+        if (JS_R_BRACE == kind) break;
+        if (JS_COMMA != kind) goto fail;
+        kind = json_next_lexeme(json, &lexeme_data);
+        json += lexeme_data.bytes_read;
     }
     return json - begin;
+fail:
+    json_object_free(*object);
+    return 0;
 }
 
-static size_t json_parse_array_value(const char * json, int array);
+static struct jsonArray * json_array_create(size_t initial_capacity) {
+    struct jsonArray * array = json_malloc(sizeof(struct jsonArray));
+    if (!array) return 0;
+    array->size = 0;
+    array->capacity = initial_capacity;
+    if (initial_capacity) {
+        array->values = json_malloc(initial_capacity * sizeof(struct jsonValue));
+        return array->values ? array : 0;
+    }
+    array->values = NULL;
+    return array;
+}
 
-static size_t json_parse_array(const char * json, int array) {
+static int json_array_add(struct jsonArray * array, struct jsonValue value) {
+    struct jsonValue * new_values;
+    if (array->size == array->capacity) {
+        if (!array->capacity) {
+            array->capacity = 4;
+            array->values = json_malloc(array->capacity * sizeof(struct jsonValue));
+            if (!array->values) return 0;
+        } else {
+            array->capacity *= 2;
+            new_values = json_malloc(array->capacity * sizeof(struct jsonValue));
+            if (!new_values) return 0;
+            memcpy(new_values, array->values, array->capacity * sizeof(struct jsonValue));
+            json_free(array->values);
+            array->values = new_values;
+        }
+    }
+    array->values[array->size++] = value;
+    return 1;
+}
+
+static void json_array_free(struct jsonArray * array) {
+    size_t i;
+    if (array->values) {
+        for (i = 0; i < array->size; ++i) {
+            json_value_free(array->values[i]);
+        }
+        json_free(array->values);
+    }
+    json_free(array);
+}
+
+// '[' was read
+static size_t json_parse_array(const char * json, struct jsonArray ** array) {
     const char * begin = json;
-    struct jsonLexemeData data;
-    enum jsonLexemeKind kind;
+    struct jsonValue value;
     size_t bytes_read;
-    if (JS_L_SQUARE_BRACKET != json_next_lexeme(json, &data)) return 0;
-    json += data.bytes_read;
-    kind = json_next_lexeme(json, &data);
-    json += data.bytes_read;
-    if (JS_R_SQUARE_BRACKET == kind) return json - begin;
+    enum jsonLexemeKind kind;
+    if (JS_R_SQUARE_BRACKET == json_next_lexeme(json, &lexeme_data)) {
+        *array = json_array_create(0);
+        return lexeme_data.bytes_read;
+    }
+    *array = json_array_create(4);
     while (1) {
-        bytes_read = json_parse_array_value(json, array);
-        if (!bytes_read) return 0;
-        json += bytes_read;
-        kind = json_next_lexeme(json, &data);
-        json += data.bytes_read;
-        if (JS_R_SQUARE_BRACKET == kind) return json - begin;
-        if (JS_COMMA != kind) return 0;
+        bytes_read = json_parse_value(json, &value);
+        if (!bytes_read) goto fail;
+        json += bytes_read;       
+        kind = json_next_lexeme(json, &lexeme_data);
+        json += lexeme_data.bytes_read;
+        json_array_add(*array, value);
+        if (kind == JS_R_SQUARE_BRACKET) break;
+        if (kind != JS_COMMA) goto fail;
     }
     return json - begin;
+fail:
+    json_array_free(*array);
+    return 0;
 }
 
-static size_t json_parse_field_value(const char * json, int field) {
-    struct jsonLexemeData data;
-    int t;
-    char * str;
+extern size_t json_parse_value(const char * json, struct jsonValue * value) {
+    struct jsonValue ret;
     size_t bytes_read;
-    switch (json_next_lexeme(json, &data)) {
+    switch (json_next_lexeme(json, &lexeme_data)) {
     case JS_L_BRACE: 
-        t = create_object();
-        bytes_read = json_parse_object(json, t);
-        if (!bytes_read) return 0;
-        set_field_object(field, t);
-        return bytes_read;
+        ret.kind = JVK_OBJ;
+        ret.obj = json_malloc(sizeof(struct jsonObject));
+        if (!ret.obj) return 0;
+        json += lexeme_data.bytes_read;
+        bytes_read = json_parse_object(json, &ret.obj);
+        if (!bytes_read) {
+            json_value_free(ret);
+            return 0;
+        }
+        *value = ret;
+        return lexeme_data.bytes_read + bytes_read;
     case JS_L_SQUARE_BRACKET: 
-        t = create_array();
-        bytes_read = json_parse_array(json, t);
-        if (!bytes_read) return 0;
-        set_field_object(field, t);
-        return bytes_read;
-    case JS_TRUE: 
-        set_field_bool(field, 1);
-        return data.bytes_read;
-    case JS_FALSE: 
-        set_field_bool(field, 0);
-        return data.bytes_read;
-    case JS_NULL:
-        set_field_null(field);
-        return data.bytes_read;
-    case JS_STRING:
-        str = alloc_string(data.measured_length);
-        if (!str || !json_get_string(data.begin, str)) return 0;
-        set_field_string(field, str);
-        return data.bytes_read;
-    case JS_NUMBER: 
-        set_field_number(field, strtod(data.begin, NULL));
-        return data.bytes_read;
-    default: return 0;
-    }
-}
-
-static size_t json_parse_array_value(const char * json, int array) {
-    struct jsonLexemeData data;
-    int t;
-    char * str;
-    size_t bytes_read;
-    switch (json_next_lexeme(json, &data)) {
-    case JS_L_BRACE: 
-        t = create_object();
-        bytes_read = json_parse_object(json, t);
-        if (!bytes_read) return 0;
-        array_add_object(array, t);
-        return bytes_read;
-    case JS_L_SQUARE_BRACKET: 
-        t = create_array();
-        bytes_read = json_parse_array(json, t);
-        if (!bytes_read) return 0;
-        array_add_object(array, t);
-        return bytes_read;
-    case JS_TRUE: 
-        array_add_bool(array, 1);
-        return data.bytes_read;
-    case JS_FALSE: 
-        array_add_bool(array, 0);
-        return data.bytes_read;
-    case JS_NULL:
-        array_add_null(array);
-        return data.bytes_read;
-    case JS_STRING:
-        str = alloc_string(data.measured_length);
-        if (!str || !json_get_string(data.begin, str)) return 0;
-        array_add_string(array, str);
-        return data.bytes_read;
-    case JS_NUMBER: 
-        array_add_number(array, strtod(data.begin, NULL));
-        return data.bytes_read;
-    default: return 0;
-    }
-}
-
-extern size_t json_parse(const char * json) {
-    struct jsonLexemeData data;
-    char * str;
-    double d;
-    size_t t;
-    switch (json_next_lexeme(json, &data)) {
-    case JS_L_BRACE: 
-        return (t = json_parse_object(json, create_object())) ? t + data.bytes_read : 0;
-    case JS_L_SQUARE_BRACKET: 
-        return (t = json_parse_array(json, create_array())) ? t + data.bytes_read : 0;
+        ret.kind = JVK_ARR;
+        ret.arr = json_malloc(sizeof(struct jsonArray));
+        if (!ret.arr) return 0;
+        json += lexeme_data.bytes_read;
+        bytes_read = json_parse_array(json, &ret.arr);
+        if (!bytes_read) {
+            json_value_free(ret);
+            return 0;
+        }
+        *value = ret;
+        return lexeme_data.bytes_read + bytes_read;
     case JS_TRUE:
-        set_field_bool(-1, 1);
+        ret.kind = JVK_BOOL;
+        ret.bul = 1;
         break;
     case JS_FALSE:
-        set_field_bool(-1, 0);
+        ret.kind = JVK_BOOL;
+        ret.bul = 0;
         break;
     case JS_NULL:
-        set_field_null(-1);
+        ret.kind = JVK_NULL;
         break;
     case JS_STRING:
-        str = alloc_string(data.measured_length);
-        if (!str || !json_get_string(data.begin, str)) return 0;
-        set_field_string(-1, str);
+        ret.kind = JVK_STR;
+        ret.str = json_malloc(sizeof(lexeme_data.measured_length));
+        if (!ret.str) return 0;
+        json_get_string(lexeme_data.begin, ret.str);
         break;
     case JS_NUMBER:
-        d = strtod(data.begin, NULL);
-        set_field_number(-1, d);
+        ret.kind = JVK_NUM;
+        ret.num = strtod(lexeme_data.begin, NULL);
         break;
     default: return 0;
     }
-    return data.bytes_read;
+    *value = ret;
+    return lexeme_data.bytes_read;
+}
+
+extern void json_value_free(struct jsonValue value) {
+    switch (value.kind) {
+    case JVK_OBJ: json_object_free(value.obj); break;
+    case JVK_ARR: json_array_free(value.arr);  break;
+    case JVK_STR: json_free(value.str);        break;
+    default:;
+    }
 }

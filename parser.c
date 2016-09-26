@@ -183,6 +183,7 @@ fail:
 }
 
 extern size_t json_parse_value(const char * json, struct jsonValue * value) {
+    const char * begin = json;
     struct jsonValue ret;
     size_t bytes_read;
     switch (json_next_lexeme(json, &lexeme_data)) {
@@ -196,8 +197,9 @@ extern size_t json_parse_value(const char * json, struct jsonValue * value) {
             json_value_free(ret);
             return 0;
         }
+        json += bytes_read;
         *value = ret;
-        return lexeme_data.bytes_read + bytes_read;
+        return json - begin;
     case JS_L_SQUARE_BRACKET: 
         ret.kind = JVK_ARR;
         ret.arr = json_malloc(sizeof(struct jsonArray));
@@ -208,8 +210,9 @@ extern size_t json_parse_value(const char * json, struct jsonValue * value) {
             json_value_free(ret);
             return 0;
         }
+        json += bytes_read;
         *value = ret;
-        return lexeme_data.bytes_read + bytes_read;
+        return json - begin;
     case JS_TRUE:
         ret.kind = JVK_BOOL;
         ret.bul = 1;

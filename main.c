@@ -46,8 +46,11 @@ void print_json_value(struct jsonValue value) {
     }
 }
 
-int main() {
-    const char * json = "{\"one\":1,\"two\":2}";
+int main() { 
+    const char * json = "{   \"records\": [     {\"field1\": \"outer\","
+          "\"field2\": \"thought\"},     {\"field2\": \"thought\","
+          "\"field1\": \"outer\"}   ] ,  \"special message\": \"hello,"
+          "world!\" }";
     struct jsonValue value;
     size_t bytes_read = json_parse_value(json, &value);
     if (!bytes_read) return 1;

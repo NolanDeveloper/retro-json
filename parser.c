@@ -12,16 +12,16 @@
 #define ARRAY_INITIAL_CAPACITY 4
 #define OBJECT_INITIAL_CAPACITY 8
 
-enum jsonLexemeKind { 
-    JS_ERROR, JS_L_BRACE, JS_R_BRACE, JS_L_SQUARE_BRACKET, JS_R_SQUARE_BRACKET, 
-    JS_COMMA, JS_COLON, JS_TRUE, JS_FALSE, JS_NULL, JS_STRING, JS_NUMBER, 
+enum LexemeKind { 
+    JLK_ERROR, JLK_L_BRACE, JLK_R_BRACE, JLK_L_SQUARE_BRACKET, JLK_R_SQUARE_BRACKET, 
+    JLK_COMMA, JLK_COLON, JLK_TRUE, JLK_FALSE, JLK_NULL, JLK_STRING, JLK_NUMBER, 
 };
 
-struct jsonLexemeData {
+struct LexemeData {
     size_t bytes_read;      //  - set for all
-    const char * begin;     //  - set for JS_STRING and JS_NUMBER
-                            // for JS_STRING begin points to first char inside quotes
-                            // for JS_NUMBER begin points to first char of number
+    const char * begin;     //  - set for JLK_STRING and JLK_NUMBER
+                            // for JLK_STRING begin points to first char inside quotes
+                            // for JLK_NUMBER begin points to first char of number
     size_t measured_length; //  - set for string
 };
 
@@ -34,7 +34,7 @@ static int utf8_bytes_left[256] = {
     [ 0xf8 ... 0xff ] = -1,
 };
 
-static struct jsonLexemeData lexeme_data;
+static struct LexemeData lexeme_data;
 
 static size_t get_utf8_code_point_length(int32_t hex) {
     if (hex <= 0x007f)
@@ -44,7 +44,7 @@ static size_t get_utf8_code_point_length(int32_t hex) {
     return 3;
 }
 
-static size_t read_string_lexeme(const char * json, struct jsonLexemeData * data) {
+static size_t read_string_lexeme(const char * json, struct LexemeData * data) {
     enum State { 
         S_NEXT_CHAR, S_ONE_LEFT, S_TWO_LEFT, S_THREE_LEFT, S_ESCAPE
     }; 
@@ -108,7 +108,7 @@ static size_t read_string_lexeme(const char * json, struct jsonLexemeData * data
     }
 }
 
-static size_t read_number_lexeme(const char * json, struct jsonLexemeData * data) {
+static size_t read_number_lexeme(const char * json, struct LexemeData * data) {
     const char * begin = json;
     if ('-' == *json) ++json;
          if ('0' == *json) ++json;
@@ -140,37 +140,37 @@ static int is_prefix(const char * prefix, const char * str) {
     case (c): data->bytes_read = json + 1 - begin; return k;
 #define CONCRETE_WORD_LEXEME(c, w, k) \
     case (c):  \
-        if (is_prefix((w), json)) return JS_ERROR; \
+        if (is_prefix((w), json)) return JLK_ERROR; \
         data->bytes_read = json - begin + sizeof(w) - 1; \
         return (k);
-extern enum jsonLexemeKind json_next_lexeme(
-        const char * json, struct jsonLexemeData * data) {
+extern enum LexemeKind json_next_lexeme(
+        const char * json, struct LexemeData * data) {
     const char * begin = json;
     size_t t;
     while (isspace(*json)) ++json;
     switch (*json) {
-    case '\0': return JS_ERROR;
-    SINGLE_CHAR_LEXEME('{', JS_L_BRACE)
-    SINGLE_CHAR_LEXEME('}', JS_R_BRACE)
-    SINGLE_CHAR_LEXEME('[', JS_L_SQUARE_BRACKET)
-    SINGLE_CHAR_LEXEME(']', JS_R_SQUARE_BRACKET)
-    SINGLE_CHAR_LEXEME(',', JS_COMMA)
-    SINGLE_CHAR_LEXEME(':', JS_COLON)
-    CONCRETE_WORD_LEXEME('t', "true",  JS_TRUE)
-    CONCRETE_WORD_LEXEME('f', "false", JS_FALSE)
-    CONCRETE_WORD_LEXEME('n', "null",  JS_NULL)
+    case '\0': return JLK_ERROR;
+    SINGLE_CHAR_LEXEME('{', JLK_L_BRACE)
+    SINGLE_CHAR_LEXEME('}', JLK_R_BRACE)
+    SINGLE_CHAR_LEXEME('[', JLK_L_SQUARE_BRACKET)
+    SINGLE_CHAR_LEXEME(']', JLK_R_SQUARE_BRACKET)
+    SINGLE_CHAR_LEXEME(',', JLK_COMMA)
+    SINGLE_CHAR_LEXEME(':', JLK_COLON)
+    CONCRETE_WORD_LEXEME('t', "true",  JLK_TRUE)
+    CONCRETE_WORD_LEXEME('f', "false", JLK_FALSE)
+    CONCRETE_WORD_LEXEME('n', "null",  JLK_NULL)
     case '"': 
         t = read_string_lexeme(json, data); 
-        if (!t) return JS_ERROR;
+        if (!t) return JLK_ERROR;
         json += t;
         data->bytes_read = json - begin;
-        return JS_STRING;
+        return JLK_STRING;
     default:
         t = read_number_lexeme(json, data); 
-        if (!t) return JS_ERROR;
+        if (!t) return JLK_ERROR;
         json += t;
         data->bytes_read = json - begin;
-        return JS_NUMBER;
+        return JLK_NUMBER;
     }
 }
 
@@ -268,7 +268,7 @@ static int json_object_add_pair(struct jsonObject * object, char * key,
     }
     size_t h = hash((unsigned char *) key) % object->capacity;
     while (object->buckets[h].key) {
-        if (!strcpy(key, object->buckets[h].key)) return 0;
+        if (!strcmp(key, object->buckets[h].key)) return 0;
         h = (h + 1) % object->capacity;
     }
     object->buckets[h].key = key;
@@ -339,20 +339,20 @@ static size_t json_parse_object(const char * json, struct jsonObject ** object) 
     const char * begin = json;
     char * name;
     struct jsonValue value;
-    enum jsonLexemeKind kind = json_next_lexeme(json, &lexeme_data);
+    enum LexemeKind kind = json_next_lexeme(json, &lexeme_data);
     size_t bytes_read;
     json += lexeme_data.bytes_read;
-    if (kind == JS_R_BRACE) {
+    if (kind == JLK_R_BRACE) {
         *object = json_object_create(0);
         return lexeme_data.bytes_read;
     }
     *object = json_object_create(10);
     while (1) {
-        if (JS_STRING != kind) goto fail2;
+        if (JLK_STRING != kind) goto fail2;
         name = json_malloc(lexeme_data.measured_length);
         if (!name) goto fail2;
         if (!unescape_string(lexeme_data.begin, name)) goto fail1;
-        if (JS_COLON != json_next_lexeme(json, &lexeme_data)) goto fail1;
+        if (JLK_COLON != json_next_lexeme(json, &lexeme_data)) goto fail1;
         json += lexeme_data.bytes_read;
         bytes_read = json_parse_value(json, &value);
         if (!bytes_read) goto fail1;
@@ -360,8 +360,8 @@ static size_t json_parse_object(const char * json, struct jsonObject ** object) 
         json_object_add_pair(*object, name, value);
         kind = json_next_lexeme(json, &lexeme_data);
         json += lexeme_data.bytes_read;
-        if (JS_R_BRACE == kind) break;
-        if (JS_COMMA != kind) goto fail2;
+        if (JLK_R_BRACE == kind) break;
+        if (JLK_COMMA != kind) goto fail2;
         kind = json_next_lexeme(json, &lexeme_data);
         json += lexeme_data.bytes_read;
     }
@@ -423,8 +423,8 @@ static size_t json_parse_array(const char * json, struct jsonArray ** array) {
     const char * begin = json;
     struct jsonValue value;
     size_t bytes_read;
-    enum jsonLexemeKind kind;
-    if (JS_R_SQUARE_BRACKET == json_next_lexeme(json, &lexeme_data)) {
+    enum LexemeKind kind;
+    if (JLK_R_SQUARE_BRACKET == json_next_lexeme(json, &lexeme_data)) {
         *array = json_array_create(0);
         return lexeme_data.bytes_read;
     }
@@ -436,8 +436,8 @@ static size_t json_parse_array(const char * json, struct jsonArray ** array) {
         kind = json_next_lexeme(json, &lexeme_data);
         json += lexeme_data.bytes_read;
         json_array_add(*array, value);
-        if (kind == JS_R_SQUARE_BRACKET) break;
-        if (kind != JS_COMMA) goto fail;
+        if (kind == JLK_R_SQUARE_BRACKET) break;
+        if (kind != JLK_COMMA) goto fail;
     }
     return json - begin;
 fail:
@@ -451,7 +451,7 @@ extern size_t json_parse_value(const char * json, struct jsonValue * value) {
     struct jsonValue ret;
     size_t bytes_read;
     switch (json_next_lexeme(json, &lexeme_data)) {
-    case JS_L_BRACE: 
+    case JLK_L_BRACE: 
         ret.kind = JVK_OBJ;
         json += lexeme_data.bytes_read;
         bytes_read = json_parse_object(json, &ret.obj);
@@ -459,7 +459,7 @@ extern size_t json_parse_value(const char * json, struct jsonValue * value) {
         json += bytes_read;
         *value = ret;
         return json - begin;
-    case JS_L_SQUARE_BRACKET: 
+    case JLK_L_SQUARE_BRACKET: 
         ret.kind = JVK_ARR;
         json += lexeme_data.bytes_read;
         bytes_read = json_parse_array(json, &ret.arr);
@@ -467,24 +467,24 @@ extern size_t json_parse_value(const char * json, struct jsonValue * value) {
         json += bytes_read;
         *value = ret;
         return json - begin;
-    case JS_TRUE:
+    case JLK_TRUE:
         ret.kind = JVK_BOOL;
         ret.bul = 1;
         break;
-    case JS_FALSE:
+    case JLK_FALSE:
         ret.kind = JVK_BOOL;
         ret.bul = 0;
         break;
-    case JS_NULL:
+    case JLK_NULL:
         ret.kind = JVK_NULL;
         break;
-    case JS_STRING:
+    case JLK_STRING:
         ret.kind = JVK_STR;
         ret.str = json_malloc(sizeof(lexeme_data.measured_length));
         if (!ret.str) return 0;
         unescape_string(lexeme_data.begin, ret.str);
         break;
-    case JS_NUMBER:
+    case JLK_NUMBER:
         ret.kind = JVK_NUM;
         ret.num = strtod(lexeme_data.begin, NULL);
         break;

@@ -54,26 +54,14 @@ void print_json_value(struct jsonValue value, int offset) {
     }
 }
 
+#define BUFFER_SIZE (32 * 1024)
+
 int main() { 
-    const char * json = "{\"menu\": {\r\n    \"header\": \"SVG Viewer\",\r\n"
-        "\"items\": [\r\n        {\"id\": \"Open\"},\r\n        {\"id\":"
-        "\"OpenNew\", \"label\": \"Open New\"},\r\n        null,\r\n"
-        "{\"id\": \"ZoomIn\", \"label\": \"Zoom In\"},\r\n        {\"id\":"
-        "\"ZoomOut\", \"label\": \"Zoom Out\"},\r\n        {\"id\":"
-        "\"OriginalView\", \"label\": \"Original View\"},\r\n        null,\r\n"
-        "{\"id\": \"Quality\"},\r\n        {\"id\": \"Pause\"},\r\n"
-        "{\"id\": \"Mute\"},\r\n        null,\r\n        {\"id\": \"Find\","
-        "\"label\": \"Find...\"},\r\n        {\"id\": \"FindAgain\", \"label\":"
-        "\"Find Again\"},\r\n        {\"id\": \"Copy\"},\r\n        {\"id\":"
-        "\"CopyAgain\", \"label\": \"Copy Again\"},\r\n        {\"id\":"
-        "\"CopySVG\", \"label\": \"Copy SVG\"},\r\n        {\"id\":"
-        "\"ViewSVG\", \"label\": \"View SVG\"},\r\n        {\"id\":"
-        "\"ViewSource\", \"label\": \"View Source\"},\r\n        {\"id\":"
-        "\"SaveAs\", \"label\": \"Save As\"},\r\n        null,\r\n"
-        "{\"id\": \"Help\"},\r\n        {\"id\": \"About\", \"label\":"
-        "\"About Adobe CVG Viewer...\"}\r\n    ]\r\n}}";
+    char * buffer = malloc(BUFFER_SIZE);
     struct jsonValue value;
-    if (!json_parse_value(json, &value)) return 1;
+    size_t bytes_read = fread(buffer, BUFFER_SIZE, sizeof(char), stdin);
+    if (bytes_read == BUFFER_SIZE) return 1;
+    if (!json_parse_value(buffer, &value)) return 1;
     print_json_value(value, 0);
     puts("");
     json_value_free(value);

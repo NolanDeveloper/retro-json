@@ -16,9 +16,9 @@ void print_json_object(struct jsonObject * object) {
     int not_first = 0;
     printf("{ ");
     for (i = 0; i < object->capacity; ++i) {
-        if (!object->buckets[i].name) continue;
+        if (!object->buckets[i].key) continue;
         if (not_first) printf(", ");
-        printf("\"%s\" : ", object->buckets[i].name);
+        printf("\"%s\" : ", object->buckets[i].key);
         print_json_value(object->buckets[i].value);
         not_first = 1;
     }
@@ -55,6 +55,13 @@ int main() {
     size_t bytes_read = json_parse_value(json, &value);
     if (!bytes_read) return 1;
     print_json_value(value);
+    puts("");
+    struct jsonValue records = json_object_value_at(value.obj, "records");
+    if (!records.kind) return 1;
+    struct jsonValue * first = &records.arr->values[0];
+    struct jsonValue field1 = json_object_value_at(first->obj, "field1");
+    if (!field1.kind) return 1;
+    print_json_value(field1);
     puts("");
     return 0;
 }

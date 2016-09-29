@@ -369,6 +369,16 @@ static void json_object_free(struct jsonObject * object) {
     json_free(object);
 }
 
+void json_object_traverse(struct jsonObject * object,
+        void (*action)(const char * key, struct jsonValue)) {
+    if (!object->size) return;
+    size_t i;
+    for (i = 0; i < object->size; ++i) {
+        if (!object->keys[i]) continue;
+        action(object->keys[i], object->values[i]);
+    }
+}
+
 // '{' was read
 static size_t json_parse_object(const char * json, struct jsonObject ** object) {
     const char * begin = json;
@@ -446,6 +456,14 @@ static void json_array_free(struct jsonArray * array) {
         json_free(array->values);
     }
     json_free(array);
+}
+
+extern void json_array_traverse(struct jsonArray * array,
+        void (*action)(size_t, struct jsonValue)) {
+    size_t i;
+    for (i = 0; i < array->size; ++i) {
+        action(i, array->values[i]);
+    }
 }
 
 // '[' was read

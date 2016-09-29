@@ -18,11 +18,11 @@ void print_json_object(struct jsonObject * object, int offset) {
     int not_first = 0;
     printf("{\n");
     for (i = 0; i < object->capacity; ++i) {
-        if (!object->buckets[i].key) continue;
+        if (!object->keys[i]) continue;
         if (not_first) printf(",\n");
         print_offset(offset + 1);
-        printf("\"%s\" : ", object->buckets[i].key);
-        print_json_value(object->buckets[i].value, offset + 1);
+        printf("\"%s\" : ", object->keys[i]);
+        print_json_value(object->values[i], offset + 1);
         not_first = 1;
     }
     puts("");
@@ -56,7 +56,7 @@ void print_json_value(struct jsonValue value, int offset) {
 
 #define BUFFER_SIZE (32 * 1024)
 
-int main() { 
+int from_stdin() {
     char * buffer = malloc(BUFFER_SIZE);
     struct jsonValue value;
     size_t bytes_read = fread(buffer, BUFFER_SIZE, sizeof(char), stdin);
@@ -65,5 +65,20 @@ int main() {
     print_json_value(value, 0);
     puts("");
     json_value_free(value);
+    free(buffer);
     return 0;
+}
+
+int from_string() {
+    const char * json = "[ { \"name\" : \"101 (MM4)\", \"id\" : 1 } ]";
+    struct jsonValue value;
+    if (!json_parse_value(json, &value)) return 1;
+    print_json_value(value, 0);
+    json_value_free(value);
+    puts("");
+    return 0;
+}
+
+int main() {
+    return from_stdin();
 }

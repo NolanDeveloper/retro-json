@@ -1,8 +1,20 @@
 // author: Nolan <sullen.goose@gmail.com>
 // Copy if you can.
 
-struct jsonObject;
-struct jsonArray;
+struct jsonValue;
+
+struct jsonObject {
+    char ** keys;
+    struct jsonValue * values;
+    size_t size;
+    size_t capacity;
+};
+
+struct jsonArray {
+    struct jsonValue * values;
+    size_t size;
+    size_t capacity;
+};
 
 enum jsonValueKind { JVK_STR = 1, JVK_NUM, JVK_OBJ, JVK_ARR, JVK_BOOL, JVK_NULL };
 
@@ -17,26 +29,11 @@ struct jsonValue {
     };
 };
 
-struct jsonPair {
-    char * key;
-    struct jsonValue value;
-};
-
-struct jsonObject {
-    struct jsonPair * buckets;
-    size_t size;
-    size_t capacity;
-};
-
-struct jsonArray {
-    struct jsonValue * values;
-    size_t size;
-    size_t capacity;
-};
-
 size_t json_parse_value(const char * json, struct jsonValue * value);
+
 void json_value_free(struct jsonValue value);
-struct jsonValue json_object_value_at(struct jsonObject * object, const char * key);
+
+struct jsonValue json_object_get_value(struct jsonObject * object, const char * key);
 
 extern void * (*json_malloc)(size_t);
 extern void (*json_free)(void *);

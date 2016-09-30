@@ -66,13 +66,12 @@ int from_stdin() {
     struct jsonValue value;
     size_t bytes_read = fread(buffer, sizeof(char), BUFFER_SIZE, stdin);
     int ret = 0;
-    if (bytes_read == BUFFER_SIZE) { ret = 1; goto end2; }
-    if (!json_parse_value(buffer, &value)) { ret = 1; goto end1; }
+    if (bytes_read == BUFFER_SIZE) { ret = 1; goto end; }
+    if (!json_parse_value(buffer, &value)) { ret = 1; goto end; }
     print_json_value(value, 0);
     puts("");
-end1:
     json_value_free(value);
-end2:
+end:
     free(buffer);
     return ret;
 }

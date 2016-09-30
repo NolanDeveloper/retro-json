@@ -35,11 +35,11 @@ void json_value_free(struct jsonValue value);
 
 struct jsonValue json_object_get_value(struct jsonObject * object, const char * key);
 
-void json_object_traverse(struct jsonObject * object,
-        void (*action)(const char *, struct jsonValue));
+void json_object_for_each(struct jsonObject * object,
+        void (*action)(const char *, struct jsonValue, void *), void * user_data);
 
-void json_array_traverse(struct jsonArray * array,
-        void (*action)(size_t, struct jsonValue));
+void json_array_for_each(struct jsonArray * array,
+        void (*action)(size_t, struct jsonValue, void *), void * user_data);
 
 extern void * (*json_malloc)(size_t);
 extern void (*json_free)(void *);

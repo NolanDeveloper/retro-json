@@ -13,31 +13,36 @@ void print_offset(int offset) { int i; for (i = 0; i < offset; ++i) printf("    
 
 void print_json_value(struct jsonValue value, int offset);
 
+void print_json_pair(const char * key, struct jsonValue value, void * user_data) {
+    int * not_first = user_data;
+    int * offset = not_first + 1;
+    if (*not_first) printf(",\n");
+    print_offset(*offset + 1);
+    printf("\"%s\" : ", key);
+    print_json_value(value, *offset + 1);
+    *not_first = 1;
+}
+
 void print_json_object(struct jsonObject * object, int offset) {
-    size_t i;
     int not_first = 0;
     printf("{\n");
-    for (i = 0; i < object->capacity; ++i) {
-        if (!object->keys[i]) continue;
-        if (not_first) printf(",\n");
-        print_offset(offset + 1);
-        printf("\"%s\" : ", object->keys[i]);
-        print_json_value(object->values[i], offset + 1);
-        not_first = 1;
-    }
+    json_object_for_each(object, print_json_pair, &not_first);
     puts("");
     print_offset(offset);
     printf("}");
 }
 
+void print_json_value_in_array(size_t i, struct jsonValue value, void * user_data) {
+    int * offset = user_data;
+    struct jsonArray ** array = (struct jsonArray **) (offset + 1);
+    print_offset(*offset + 1);
+    print_json_value(value, *offset + 1);
+    if (i != (*array)->size - 1) printf(",\n");
+}
+
 void print_json_array(struct jsonArray * array, int offset) {
-    size_t i;
     printf("[\n");
-    for (i = 0; i < array->size; ++i) {
-        print_offset(offset + 1);
-        print_json_value(array->values[i], offset + 1);
-        if (i != array->size - 1) printf(",\n");
-    }
+    json_array_for_each(array, print_json_value_in_array, &offset);
     puts("");
     print_offset(offset);
     printf("]");
@@ -59,14 +64,17 @@ void print_json_value(struct jsonValue value, int offset) {
 int from_stdin() {
     char * buffer = malloc(BUFFER_SIZE);
     struct jsonValue value;
-    size_t bytes_read = fread(buffer, BUFFER_SIZE, sizeof(char), stdin);
-    if (bytes_read == BUFFER_SIZE) return 1;
-    if (!json_parse_value(buffer, &value)) return 1;
+    size_t bytes_read = fread(buffer, sizeof(char), BUFFER_SIZE, stdin);
+    int ret = 0;
+    if (bytes_read == BUFFER_SIZE) { ret = 1; goto end2; }
+    if (!json_parse_value(buffer, &value)) { ret = 1; goto end1; }
     print_json_value(value, 0);
     puts("");
+end1:
     json_value_free(value);
+end2:
     free(buffer);
-    return 0;
+    return ret;
 }
 
 int from_string() {
@@ -81,4 +89,5 @@ int from_string() {
 
 int main() {
     return from_stdin();
+    //return from_string();
 }

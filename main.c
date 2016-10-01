@@ -1,10 +1,17 @@
-// author: Nolan <sullen.goose@gmail.com>
-// Copy if you can.
+/*
+ * author: Nolan <sullen.goose@gmail.com>
+ * Copy if you can.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "parser.h"
+
+struct int_pair {
+    int first;
+    int second;
+};
 
 void * (*json_malloc)(size_t) = malloc;
 void (*json_free)(void *) = free;
@@ -14,19 +21,18 @@ void print_offset(int offset) { int i; for (i = 0; i < offset; ++i) printf("    
 void print_json_value(struct jsonValue value, int offset);
 
 void print_json_pair(const char * key, struct jsonValue value, void * user_data) {
-    int * not_first = user_data;
-    int * offset = not_first + 1;
-    if (*not_first) printf(",\n");
-    print_offset(*offset + 1);
+    struct int_pair * p = user_data;
+    if (p->first) printf(",\n");
+    print_offset(p->second + 1);
     printf("\"%s\" : ", key);
-    print_json_value(value, *offset + 1);
-    *not_first = 1;
+    print_json_value(value, p->second + 1);
+    p->first = 1;
 }
 
 void print_json_object(struct jsonObject * object, int offset) {
-    int not_first = 0;
+    struct int_pair p = { 0, offset };
     printf("{\n");
-    json_object_for_each(object, print_json_pair, &not_first);
+    json_object_for_each(object, print_json_pair, &p);
     puts("");
     print_offset(offset);
     printf("}");
@@ -50,11 +56,11 @@ void print_json_array(struct jsonArray * array, int offset) {
 
 void print_json_value(struct jsonValue value, int offset) {
     switch (value.kind) {
-    case JVK_STR: printf("\"%s\"", value.str); break;
-    case JVK_NUM: printf("%lf", value.num); break;
-    case JVK_OBJ: print_json_object(value.obj, offset); break;
-    case JVK_ARR: print_json_array(value.arr, offset); break;
-    case JVK_BOOL: printf(value.bul ? "true" : "false"); break;
+    case JVK_STR: printf("\"%s\"", value.value.string); break;
+    case JVK_NUM: printf("%lf", value.value.number); break;
+    case JVK_OBJ: print_json_object(value.value.object, offset); break;
+    case JVK_ARR: print_json_array(value.value.array, offset); break;
+    case JVK_BOOL: printf(value.value.boolean ? "true" : "false"); break;
     case JVK_NULL: printf("null"); break;
     }
 }
@@ -88,5 +94,4 @@ int from_string() {
 
 int main() {
     return from_stdin();
-    //return from_string();
 }

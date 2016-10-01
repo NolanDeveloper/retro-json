@@ -56,12 +56,12 @@ void print_json_array(struct jsonArray * array, int offset) {
 
 void print_json_value(struct jsonValue value, int offset) {
     switch (value.kind) {
-    case JVK_STR: printf("\"%s\"", value.value.string); break;
-    case JVK_NUM: printf("%lf", value.value.number); break;
-    case JVK_OBJ: print_json_object(value.value.object, offset); break;
-    case JVK_ARR: print_json_array(value.value.array, offset); break;
+    case JVK_STR:  printf("\"%s\"", value.value.string);           break;
+    case JVK_NUM:  printf("%lf", value.value.number);              break;
+    case JVK_OBJ:  print_json_object(value.value.object, offset);  break;
+    case JVK_ARR:  print_json_array(value.value.array, offset);    break;
     case JVK_BOOL: printf(value.value.boolean ? "true" : "false"); break;
-    case JVK_NULL: printf("null"); break;
+    case JVK_NULL: printf("null");                                 break;
     }
 }
 

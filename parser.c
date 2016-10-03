@@ -6,7 +6,6 @@
 #include <assert.h>
 #include <ctype.h>
 #include <inttypes.h>
-#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -22,12 +21,26 @@ enum LexemeKind {
 
 struct LexemeData {
     enum LexemeKind kind;
-    const char * begin;
     union {
-        size_t unescaped_length;
+        struct {
+            char * unescaped;
+            size_t length;
+        } string;
         double number;
-    } ex;
+    } extra;
 };
+
+#define MAX_PAGES 128
+#define PAGE_SIZE (128 * 1024)
+#define BIG_SIZE (16 * 1024)
+
+struct {
+    char * pages[MAX_PAGES];
+    short counts[MAX_PAGES];
+    size_t current_page;
+    char * position;
+    int andvance_allocation;
+} allocator;
 
 static int utf8_bytes_left[256] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -67,24 +80,71 @@ static int is_trailing_utf8_byte[256] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 };
 
-static uint32_t ctoh[256] = {
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  0,  0,  0,  0,  0,  0,
-   0, 10, 11, 12, 13, 14, 15,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0, 10, 11, 12, 13, 14, 15,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-};
+static size_t seq_alloc_bytes_left() {
+    return allocator.position
+        ? allocator.pages[allocator.current_page] + PAGE_SIZE - allocator.position
+        : 0;
+}
+
+static int seq_alloc_new_page() {
+    char * new_page;
+    int i;
+    new_page = json_malloc(PAGE_SIZE);
+    if (!new_page) return 0;
+    for (i = 0; i < MAX_PAGES; ++i) {
+        if (!allocator.pages[i]) break;
+    }
+    if (i == MAX_PAGES) return 0;
+    allocator.current_page = i;
+    allocator.counts[i] = 0;
+    allocator.position = allocator.pages[i] = new_page;
+    return 1;
+}
+
+static void * seq_alloc_begin_andvance_allocation() {
+    if (seq_alloc_bytes_left() < BIG_SIZE + 1) {
+        if (!seq_alloc_new_page()) return NULL;
+    }
+    ++allocator.counts[allocator.current_page];
+    *allocator.position++ = allocator.current_page;
+    allocator.andvance_allocation = 1;
+    return allocator.position;
+}
+
+static void seq_alloc_reject_advance_allocation() {
+    assert(allocator.andvance_allocation);
+    allocator.andvance_allocation = 0;
+}
+
+static void seq_alloc_perform_andvance_allocation(void * end) {
+    assert(allocator.andvance_allocation);
+    assert((void *) allocator.position < end);
+    assert((char *) end - allocator.pages[allocator.current_page] < PAGE_SIZE);
+    allocator.andvance_allocation = 0;
+    allocator.position = end;
+}
+
+static void * seq_alloc_allocate(size_t bytes) {
+    void * memory;
+    assert(bytes + 1 < BIG_SIZE);
+    assert(!allocator.andvance_allocation);
+    if (seq_alloc_bytes_left() < bytes) {
+        if (!seq_alloc_new_page()) return NULL;
+    }
+    ++allocator.counts[allocator.current_page];
+    *allocator.position++ = allocator.current_page;
+    memory = allocator.position;
+    allocator.position += bytes;
+    return memory;
+}
+
+static void seq_alloc_free(void * memory) {
+    unsigned char i;
+    i = *((unsigned char *) memory - 1);
+    if (--allocator.counts[i]) return;
+    json_free(allocator.pages[i]);
+    allocator.pages[i] = NULL;
+}
 
 /* Returns length of utf8 code point representing 'hex' unicode character. */
 static int get_utf8_code_point_length(int32_t hex) {
@@ -97,99 +157,25 @@ static int get_utf8_code_point_length(int32_t hex) {
 
 /* Writes code point representing 'hex' unicode character into 'out' and returns
    pointer to first byte after written code point. */
-static char * put_utf8_code_point(int32_t hex, char * out) {
+static size_t put_utf8_code_point(int32_t hex, char * out) {
     if (hex <= 0x007f) {
         *out++ = hex;
+        return 1;
     } else if (0x0080 <= hex && hex <= 0x07ff) {
         *out++ = 0xc0 | hex >> 6;
         *out++ = 0x80 | (hex & 0x3f);
+        return 2;
     } else {
         *out++ = 0xe0 | hex >> 12;
         *out++ = 0x80 | ((hex >> 6) & 0x3f);
         *out++ = 0x80 | (hex & 0x3f);
+        return 3;
     }
-    return out;
-}
-
-/* Copies code point from 'code_point' to 'out'. 'end' must point to first byte after
-   memory block 'out' points to. If there's not enough memory to fit new code point in
-   'out' function returns 0 and length of code point otherwise. */
-static size_t copy_code_point(const char * code_point, char * out, char * end) {
-    int bytes_left = utf8_bytes_left[*(unsigned char *)code_point];
-    int i;
-    if (-1 == bytes_left) return 0;
-    if (end - out < bytes_left + 1) return 0;
-    *out++ = *code_point++;
-    for (i = 0; i < bytes_left; ++i) {
-        if (!is_trailing_utf8_byte[*(unsigned char *)code_point]) return 0;
-        *out++ = *code_point++;
-    }
-    return bytes_left + 1;
 }
 
 #define E(c) case (c): *out = (c); break;
 
 #define F(c, d) case (c): *out = (d); break;
-
-/* Unescapes json string's escape sequence pointed by 'escaped' and writes this
-   code point to 'out'. */
-static int unescape_code_point(const char * escaped, char * out, char * end) {
-    const char * begin = escaped;
-    char c;
-    uint32_t hex;
-    int i;
-    switch (*escaped++) {
-    E('\\') E('\"') E('/') F('b', '\b') F('f', '\f') F('n', '\n') F('r', '\r') F('t', '\t')
-    case 'u':
-        hex = 0;
-        for (i = 0; i < 4; ++i) {
-            c = *escaped++;
-            if (!isxdigit(c)) return 0;
-            hex = (hex << 4) | ctoh[*(unsigned char *)&c];
-        }
-        if (end - out < get_utf8_code_point_length(hex)) return 0;
-        put_utf8_code_point(hex, out);
-        break;
-    default: return 0;
-    }
-    return escaped - begin;
-}
-
-/* Allocates 'data->measured_length' bytes, removes json escape sequences from
-   string starting at 'data->begin' until unescaped quote(") character and writes it
-   into allocated memory. If string was correct and memory was allocated returns
-   pointer to allocated memory otherwise returns NULL. */
-extern char * unescape_string(struct LexemeData * data) {
-    const char * json = data->begin;
-    char * unescaped = json_malloc(data->ex.unescaped_length);
-    char * end = unescaped + data->ex.unescaped_length;
-    char * out = unescaped;
-    size_t bytes_read;
-    if (!unescaped) return NULL;
-    while (1) {
-        if (out >= end) goto fail;
-        switch (*json) {
-        case '"':
-            *out++ = '\0';
-            assert(out == end);
-            return unescaped;
-        case '\\':
-            ++json;
-            if (!(bytes_read = unescape_code_point(json, out, end))) goto fail;
-            json += bytes_read;
-            out += utf8_bytes_left[*(unsigned char *)out] + 1;
-            break;
-        default:
-            if (!(bytes_read = copy_code_point(json, out, end))) goto fail;
-            out += bytes_read;
-            json += bytes_read;
-            break;
-        }
-    }
-fail:
-    json_free(unescaped);
-    return NULL;
-}
 
 /* 'escape' must point to char after backslash '\' symbol. The function calculates
    length of code point produced by this escape sequence and puts it into
@@ -216,8 +202,10 @@ static size_t measure_escape_sequence(const char * escape, size_t * code_point_l
 /* Checks that 'code_point' points to valid code point. If it is valid returns
    its lengths in bytes otherwise returns 0. */
 static size_t check_code_point(const char * code_point) {
-    const char * begin = code_point;
-    int bytes_left = utf8_bytes_left[*(const unsigned char *)code_point];
+    const char * begin;
+    int bytes_left;
+    begin = code_point;
+    bytes_left = utf8_bytes_left[*(const unsigned char *)code_point];
     if (-1 == bytes_left) return 0;
     ++code_point;
     while (bytes_left--) {
@@ -235,7 +223,8 @@ static size_t measure_string_lexeme(const char * json, size_t * unescaped_length
     const char * begin = json;
     size_t code_point_length;
     size_t bytes_read;
-    size_t ul = 0;
+    size_t ul;
+    ul = 0;
     while (1) {
         switch (*json) {
         case '"':
@@ -265,16 +254,106 @@ static int is_prefix(const char * prefix, const char * str) {
     return *prefix;
 }
 
+#define READ_CODE_POINT(inclen, fail_lable) { \
+    switch (*json) { \
+    case '"': \
+        *out++ = '\0'; \
+        seq_alloc_perform_andvance_allocation(out); \
+        ++json; \
+        data->extra.string.unescaped = unescaped; \
+        data->extra.string.length = length; \
+        return json - begin; \
+    case '\\': \
+        ++json; \
+        switch (*json++) { \
+        case '\\': *out++ = '\\'; inclen; break; \
+        case '"': *out++ = '"'; inclen; break; \
+        case '/': *out++ = '/'; inclen; break; \
+        case 'b': *out++ = '\b'; inclen; break; \
+        case 'f': *out++ = '\f'; inclen; break; \
+        case 'n': *out++ = '\n'; inclen; break; \
+        case 'r': *out++ = '\r'; inclen; break; \
+        case 't': *out++ = '\t'; inclen; break; \
+        case 'u': \
+            hex = strtoul(json, &end, 16); \
+            json += 4; \
+            if (end != json) goto fail_lable; \
+            bytes = put_utf8_code_point(hex, out); \
+            out += bytes; \
+            while (bytes--) inclen; \
+            break; \
+        default: goto fail_lable; \
+        } \
+        break; \
+    default: \
+        left = utf8_bytes_left[*(const unsigned char *)json]; \
+        if (-1 == left) goto fail_lable; \
+        *out++ = *json++; \
+        inclen; \
+        for (i = 0; i < left; ++i) { \
+            if (!is_trailing_utf8_byte[*(unsigned char *)json]) goto fail_lable; \
+            *out++ = *json++; \
+            inclen; \
+        } \
+        break; \
+    } \
+}
+
+static size_t read_string_lexeme(const char * json, struct LexemeData * data) {
+    const char * begin;
+    char * end;
+    size_t bytes;
+    size_t length;
+    int i;
+    int left;
+    char * unescaped;
+    int mallocated;
+    char * long_unescaped;
+    size_t rest_length;
+    char * out;
+    uint32_t hex;
+    begin = json;
+    mallocated = 0;
+    length = 1;
+    unescaped = seq_alloc_begin_andvance_allocation();
+    if (!unescaped) return 0;
+    out = unescaped;
+    while (length < BIG_SIZE) READ_CODE_POINT(++length, fail1)
+    /* Rest of code will be executed only for really long lines */
+    if (!measure_string_lexeme(json, &rest_length)) goto fail1;
+    long_unescaped = json_malloc(length + rest_length);
+    if (!long_unescaped) goto fail;
+    memcpy(long_unescaped, unescaped, length);
+    seq_alloc_reject_advance_allocation();
+    length += rest_length;
+    out = long_unescaped;
+    while (1) READ_CODE_POINT((void) 0, fail)
+fail:
+    json_free(long_unescaped);
+fail1:
+    if (length < BIG_SIZE) {
+        seq_alloc_free(unescaped);
+    } else {
+        json_free(unescaped);
+    }
+    return 0;
+}
+
 #define SINGLE_CHAR_LEXEME(c, k) \
     case (c): \
+        ++json; \
         data->kind = (k); \
-        return json + 1 - begin;
+        return json - begin;
 
 #define CONCRETE_WORD_LEXEME(c, w, k) \
     case (c):  \
         if (is_prefix((w), json)) return 0; \
+        json += sizeof(w) - 1; \
         data->kind = (k); \
-        return json - begin + sizeof(w) - 1;
+        return json - begin;
+
+#define SINGLE_CHAR_SEQUENCE(c, d) \
+    case (c): *out++ = (d); ++length; ++json; break; \
 
 /* Reads next lexeme pointed by 'json' and collects data about it. Lexeme can
    be preceded by whitespaces. Data about lexeme is written into location pointed
@@ -283,11 +362,11 @@ static int is_prefix(const char * prefix, const char * str) {
    unescaped_length correspondingly. Returns number of bytes read if lexeme was
    successfully read and 0 otherwise. */
 extern size_t next_lexeme(const char * json, struct LexemeData * data) {
-    const char * begin = json;
+    const char * begin;
     char * end;
     size_t t;
+    begin = json;
     while (isspace(*json)) ++json;
-    data->begin = json;
     switch (*json) {
     case '\0': return 0;
     SINGLE_CHAR_LEXEME('{', JLK_L_BRACE)
@@ -301,14 +380,13 @@ extern size_t next_lexeme(const char * json, struct LexemeData * data) {
     CONCRETE_WORD_LEXEME('n', "null",  JLK_NULL)
     case '"':
         ++json;
-        t = measure_string_lexeme(json, &data->ex.unescaped_length);
+        t = read_string_lexeme(json, data);
         if (!t) return 0;
-        data->begin = json;
         data->kind = JLK_STRING;
         json += t;
         return json - begin;
     default:
-        data->ex.number = strtod(json, &end);
+        data->extra.number = strtod(json, &end);
         if (end == json) return 0;
         json = end;
         data->kind = JLK_NUMBER;
@@ -318,8 +396,9 @@ extern size_t next_lexeme(const char * json, struct LexemeData * data) {
 
 /* String hash function. */
 static size_t hash(unsigned char * str) {
-    size_t hash = 5381;
+    size_t hash;
     size_t c;
+    hash = 5381;
     while ((c = *str++)) hash = ((hash << 5) + hash) + c;
     return hash;
 }
@@ -328,10 +407,11 @@ static int json_object_grow(struct jsonObject * object);
 
 static int json_object_add_pair(struct jsonObject * object, char * key,
         struct jsonValue value) {
+    size_t h;
     if (3 * object->size >= 2 * object->capacity) {
         if (!json_object_grow(object)) return 0;
     }
-    size_t h = hash((unsigned char *) key) % object->capacity;
+    h = hash((unsigned char *) key) % object->capacity;
     while (object->keys[h]) {
         if (!strcmp(key, object->keys[h])) return 0;
         h = (h + 1) % object->capacity;
@@ -343,13 +423,18 @@ static int json_object_add_pair(struct jsonObject * object, char * key,
 }
 
 static int json_object_grow(struct jsonObject * object) {
-    assert(object->capacity);
-    size_t old_capacity = object->capacity;
-    char ** old_keys = object->keys;
-    struct jsonValue * old_values = object->values;
+    size_t old_capacity;
+    char ** old_keys;
+    struct jsonValue * old_values;
     size_t i;
-    size_t keys_size = 2 * object->capacity * sizeof(char *);
-    size_t values_size = 2 * object->capacity * sizeof(struct jsonValue);
+    size_t keys_size;
+    size_t values_size;
+    assert(object->capacity);
+    old_capacity = object->capacity;
+    old_keys = object->keys;
+    old_values = object->values;
+    keys_size = 2 * object->capacity * sizeof(char *);
+    values_size = 2 * object->capacity * sizeof(struct jsonValue);
     object->size = 0;
     object->capacity *= 2;
     object->keys = json_malloc(keys_size + values_size);
@@ -368,7 +453,8 @@ static int json_object_grow(struct jsonObject * object) {
    json_object_add_pair and json_object_grow on object that was created with
    'initial_capacity' = 0. */
 static struct jsonObject * json_object_create(size_t initial_capacity) {
-    struct jsonObject * object = json_malloc(sizeof(struct jsonObject));
+    struct jsonObject * object;
+    object = json_malloc(sizeof(struct jsonObject));
     if (!object) return NULL;
     object->capacity = initial_capacity;
     object->size = 0;
@@ -393,8 +479,9 @@ static struct jsonObject * json_object_create(size_t initial_capacity) {
 /* Returns value of attribute 'key' of object 'object'. */
 extern struct jsonValue json_object_get_value(struct jsonObject * object,
         const char * key) {
-    size_t h = hash((unsigned char *)key) % object->capacity;
+    size_t h;
     struct jsonValue value;
+    h = hash((unsigned char *)key) % object->capacity;
     while (object->keys[h] && strcmp(object->keys[h], key)) {
         h = (h + 1) % object->capacity;
     }
@@ -408,7 +495,7 @@ static void json_object_free(struct jsonObject * object) {
     if (object->capacity) {
         for (i = 0; i < object->capacity; ++i) {
             if (!object->keys[i]) continue;
-            json_free(object->keys[i]);
+            seq_alloc_free(object->keys[i]);
             json_value_free(object->values[i]);
         }
         json_free(object->keys);
@@ -419,8 +506,8 @@ static void json_object_free(struct jsonObject * object) {
 /* Calls 'action' for each attribute of 'object' with its key, value and 'user_data'. */
 extern void json_object_for_each(struct jsonObject * object,
         void (*action)(const char * key, struct jsonValue, void *), void * user_data) {
-    if (!object->size) return;
     size_t i;
+    if (!object->size) return;
     for (i = 0; i < object->capacity; ++i) {
         if (!object->keys[i]) continue;
         action(object->keys[i], object->values[i], user_data);
@@ -431,11 +518,12 @@ extern void json_object_for_each(struct jsonObject * object,
    point to next lexeme after '{'. Object will be created in heap so don't
    forget to free it using json_object_free function. */
 static size_t json_parse_object(const char * json, struct jsonObject ** object) {
-    const char * begin = json;
+    const char * begin;
     char * name;
     struct jsonValue value;
     struct LexemeData data;
     size_t bytes_read;
+    begin = json;
     if (!(bytes_read = next_lexeme(json, &data))) return 0;
     json += bytes_read;
     if (data.kind == JLK_R_BRACE) {
@@ -445,8 +533,7 @@ static size_t json_parse_object(const char * json, struct jsonObject ** object) 
     *object = json_object_create(10);
     while (1) {
         if (JLK_STRING != data.kind) goto fail2;
-        name = unescape_string(&data);
-        if (!name) goto fail2;
+        name = data.extra.string.unescaped;
         if (!(bytes_read = next_lexeme(json, &data)) || JLK_COLON != data.kind) goto fail1;
         json += bytes_read;
         if (!(bytes_read = json_parse_value(json, &value))) goto fail1;
@@ -468,75 +555,74 @@ fail2:
     return 0;
 }
 
-/* Allocates and initializes json array with 'initial capacity' capacity and returns
-   pointer to it. So don't forget to call json_array_free. If
-   'initial_capacity' is 0 such array can't hold any values. */
-static struct jsonArray * json_array_create(size_t initial_capacity) {
-    struct jsonArray * array = json_malloc(sizeof(struct jsonArray));
+static struct jsonArray * json_array_create() {
+    struct jsonArray * array;
+    array = seq_alloc_allocate(sizeof(struct jsonArray));
     if (!array) return 0;
     array->size = 0;
-    array->capacity = initial_capacity;
-    if (initial_capacity) {
-        array->values = json_malloc(initial_capacity * sizeof(struct jsonValue));
-        return array->values ? array : 0;
-    }
-    array->values = NULL;
+    array->first = NULL;
+    array->last = NULL;
     return array;
 }
 
-/* Adds 'value' into 'array'. Returns 1 if value was successfully added and 0
-   otherwise. */
 static int json_array_add(struct jsonArray * array, struct jsonValue value) {
-    assert(array->capacity);
-    struct jsonValue * new_values;
-    size_t new_capacity;
-    if (array->size == array->capacity) {
-        new_capacity = 2 * array->capacity;
-        new_values = json_malloc(new_capacity * sizeof(struct jsonValue));
-        if (!new_values) return 0;
-        memcpy(new_values, array->values, array->capacity * sizeof(struct jsonValue));
-        json_free(array->values);
-        array->capacity = new_capacity;
-        array->values = new_values;
+    struct jsonArrayNode * new_node;
+    new_node = seq_alloc_allocate(sizeof(struct jsonArrayNode));
+    if (!new_node) return 0;
+    new_node->next = NULL;
+    new_node->value = value;
+    if (array->size) {
+        array->last->next = new_node;
+        array->last = new_node;
+        ++array->size;
+    } else {
+        array->last = array->first = new_node;
+        array->size = 1;
     }
-    array->values[array->size++] = value;
     return 1;
 }
 
 static void json_array_free(struct jsonArray * array) {
-    size_t i;
-    if (array->values) {
-        for (i = 0; i < array->size; ++i) {
-            json_value_free(array->values[i]);
-        }
-        json_free(array->values);
+    struct jsonArrayNode * p;
+    struct jsonArrayNode * next;
+    if (array->size) {
+        p = array->first;
+        do {
+            next = p->next;
+            json_value_free(p->value);
+            seq_alloc_free(p);
+        } while ((p = next));
     }
-    json_free(array);
+    seq_alloc_free(array);
 }
 
 /* Iterates over 'array' and for each value calls 'action' with index, value itself and
    'user_data'. */
 extern void json_array_for_each(struct jsonArray * array,
         void (*action)(size_t, struct jsonValue, void *), void * user_data) {
+    struct jsonArrayNode * p;
     size_t i;
-    for (i = 0; i < array->size; ++i) {
-        action(i, array->values[i], user_data);
+    p = array->first;
+    i = 0;
+    while (p) {
+        action(i++, p->value, user_data);
+        p = p->next;
     }
 }
 
 /* Parses json array. 'json' must point to next lexeme after '['. Don't forget to free. */
 static size_t json_parse_array(const char * json, struct jsonArray ** array) {
-    const char * begin = json;
+    const char * begin;
     struct jsonValue value;
     struct LexemeData data;
     size_t bytes_read;
+    begin = json;
     if (!(bytes_read = next_lexeme(json, &data))) return 0;
+    *array = json_array_create();
     if (JLK_R_SQUARE_BRACKET == data.kind) {
         json += bytes_read;
-        *array = json_array_create(0);
         return json - begin;
     }
-    *array = json_array_create(4);
     while (1) {
         if (!(bytes_read = json_parse_value(json, &value))) goto fail;
         json += bytes_read;
@@ -555,23 +641,22 @@ fail:
 
 /* Parses json value into 'value'. Don't forget to call json_value_free.  */
 extern size_t json_parse_value(const char * json, struct jsonValue * value) {
-    const char * begin = json;
+    const char * begin;
     struct LexemeData data;
     struct jsonValue ret;
     size_t bytes_read;
+    begin = json;
     if (!(bytes_read = next_lexeme(json, &data))) return 0;
     json += bytes_read;
     switch (data.kind) {
     case JLK_L_BRACE:
         ret.kind = JVK_OBJ;
-        bytes_read = json_parse_object(json, &ret.value.object);
-        if (!bytes_read) return 0;
+        if (!(bytes_read = json_parse_object(json, &ret.value.object))) return 0;
         json += bytes_read;
         break;
     case JLK_L_SQUARE_BRACKET:
         ret.kind = JVK_ARR;
-        bytes_read = json_parse_array(json, &ret.value.array);
-        if (!bytes_read) return 0;
+        if (!(bytes_read = json_parse_array(json, &ret.value.array))) return 0;
         json += bytes_read;
         break;
     case JLK_TRUE:
@@ -587,12 +672,14 @@ extern size_t json_parse_value(const char * json, struct jsonValue * value) {
         break;
     case JLK_STRING:
         ret.kind = JVK_STR;
-        ret.value.string = unescape_string(&data);
+        ret.value.string = seq_alloc_allocate(sizeof(struct jsonString));
         if (!ret.value.string) return 0;
+        ret.value.string->string = data.extra.string.unescaped;
+        ret.value.string->length = data.extra.string.length;
         break;
     case JLK_NUMBER:
         ret.kind = JVK_NUM;
-        ret.value.number = data.ex.number;
+        ret.value.number = data.extra.number;
         break;
     default: return 0;
     }
@@ -600,11 +687,20 @@ extern size_t json_parse_value(const char * json, struct jsonValue * value) {
     return json - begin;
 }
 
+static void json_string_free(struct jsonString * string) {
+    if (string->length < BIG_SIZE) {
+        seq_alloc_free(string->string);
+    } else {
+        json_free(string->string);
+    }
+    seq_alloc_free(string);
+}
+
 extern void json_value_free(struct jsonValue value) {
     switch (value.kind) {
     case JVK_OBJ: json_object_free(value.value.object); break;
     case JVK_ARR: json_array_free(value.value.array);   break;
-    case JVK_STR: json_free(value.value.string);        break;
+    case JVK_STR: json_string_free(value.value.string); break;
     default:;
     }
 }

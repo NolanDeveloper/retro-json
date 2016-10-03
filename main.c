@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 #include "parser.h"
+/*#include "parser.c"*/
 
 struct int_pair {
     int first;
@@ -30,7 +31,9 @@ void print_json_pair(const char * key, struct jsonValue value, void * user_data)
 }
 
 void print_json_object(struct jsonObject * object, int offset) {
-    struct int_pair p = { 0, offset };
+    struct int_pair p;
+    p.first = 0;
+    p.second = offset;
     printf("{\n");
     json_object_for_each(object, print_json_pair, &p);
     puts("");
@@ -39,16 +42,20 @@ void print_json_object(struct jsonObject * object, int offset) {
 }
 
 void print_json_value_in_array(size_t i, struct jsonValue value, void * user_data) {
-    int * offset = user_data;
-    struct jsonArray ** array = (struct jsonArray **) (offset + 1);
+    void * (*p)[2] = user_data;
+    int * offset = (*p)[0];
+    struct jsonArray * array = (*p)[1];
     print_offset(*offset + 1);
     print_json_value(value, *offset + 1);
-    if (i != (*array)->size - 1) printf(",\n");
+    if (i != array->size - 1) printf(",\n");
 }
 
 void print_json_array(struct jsonArray * array, int offset) {
+    void * p[2];
+    p[0] = &offset;
+    p[1] = array;
     printf("[\n");
-    json_array_for_each(array, print_json_value_in_array, &offset);
+    json_array_for_each(array, print_json_value_in_array, &p);
     puts("");
     print_offset(offset);
     printf("]");
@@ -56,8 +63,8 @@ void print_json_array(struct jsonArray * array, int offset) {
 
 void print_json_value(struct jsonValue value, int offset) {
     switch (value.kind) {
-    case JVK_STR:  printf("\"%s\"", value.value.string);           break;
-    case JVK_NUM:  printf("%lf", value.value.number);              break;
+    case JVK_STR:  printf("\"%s\"", value.value.string->string);   break;
+    case JVK_NUM:  printf("%f", value.value.number);               break;
     case JVK_OBJ:  print_json_object(value.value.object, offset);  break;
     case JVK_ARR:  print_json_array(value.value.array, offset);    break;
     case JVK_BOOL: printf(value.value.boolean ? "true" : "false"); break;
@@ -65,7 +72,7 @@ void print_json_value(struct jsonValue value, int offset) {
     }
 }
 
-#define BUFFER_SIZE (50 * 1024 * 1024)
+#define BUFFER_SIZE (4 * 1024 * 1024)
 
 int from_stdin() {
     char * buffer = malloc(BUFFER_SIZE);

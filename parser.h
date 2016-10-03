@@ -12,23 +12,35 @@ struct jsonObject {
     size_t capacity;
 };
 
+struct jsonArrayNode;
+
 struct jsonArray {
-    struct jsonValue * values;
+    struct jsonArrayNode * first;
+    struct jsonArrayNode * last;
     size_t size;
-    size_t capacity;
 };
 
 enum jsonValueKind { JVK_STR = 1, JVK_NUM, JVK_OBJ, JVK_ARR, JVK_BOOL, JVK_NULL };
 
+struct jsonString {
+    char * string;
+    size_t length;
+};
+
 struct jsonValue {
     enum jsonValueKind kind;
     union {
-        char * string;
         double number;
+        struct jsonString * string;
         struct jsonObject * object;
         struct jsonArray * array;
         int boolean;
     } value;
+};
+
+struct jsonArrayNode {
+    struct jsonArrayNode * next;
+    struct jsonValue value;
 };
 
 /* Parses json value from string pointed by 'json' into variable pointed by 'value'.

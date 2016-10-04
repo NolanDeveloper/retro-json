@@ -7,7 +7,6 @@
 #include <stdlib.h>
 
 #include "parser.h"
-/*#include "parser.c"*/
 
 struct int_pair {
     int first;
@@ -47,7 +46,7 @@ void print_json_value_in_array(size_t i, struct jsonValue value, void * user_dat
     struct jsonArray * array = (*p)[1];
     print_offset(*offset + 1);
     print_json_value(value, *offset + 1);
-    if (i != array->size - 1) printf(",\n");
+    if (i != json_array_size(array) - 1) printf(",\n");
 }
 
 void print_json_array(struct jsonArray * array, int offset) {
@@ -63,7 +62,7 @@ void print_json_array(struct jsonArray * array, int offset) {
 
 void print_json_value(struct jsonValue value, int offset) {
     switch (value.kind) {
-    case JVK_STR:  printf("\"%s\"", value.value.string->string);   break;
+    case JVK_STR:  printf("\"%s\"", json_string(value.value.string));   break;
     case JVK_NUM:  printf("%f", value.value.number);               break;
     case JVK_OBJ:  print_json_object(value.value.object, offset);  break;
     case JVK_ARR:  print_json_array(value.value.array, offset);    break;

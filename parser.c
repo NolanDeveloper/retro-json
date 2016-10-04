@@ -19,20 +19,51 @@ enum LexemeKind {
     JLK_COMMA, JLK_COLON, JLK_TRUE, JLK_FALSE, JLK_NULL, JLK_STRING, JLK_NUMBER
 };
 
+struct jsonString {
+    char * string;
+    size_t length;
+};
+
 struct LexemeData {
     enum LexemeKind kind;
     union {
-        struct {
-            char * unescaped;
-            size_t length;
-        } string;
+        struct jsonString * unescaped;
         double number;
     } extra;
 };
 
-#define MAX_PAGES 128
-#define PAGE_SIZE (128 * 1024)
-#define BIG_SIZE (16 * 1024)
+struct ObjectNode {
+    struct ObjectNode * left;
+    struct ObjectNode * right;
+    struct ObjectNode * parent;
+    enum Color {
+        BLACK, RED
+    } color;
+    struct jsonString * key;
+    struct jsonValue value;
+};
+
+struct jsonObject {
+    struct ObjectNode * root;
+    struct ObjectNode __nil;
+    struct ObjectNode * nil;
+    size_t size;
+};
+
+struct jsonArray {
+    struct jsonArrayNode * first;
+    struct jsonArrayNode * last;
+    size_t size;
+};
+
+struct jsonArrayNode {
+    struct jsonArrayNode * next;
+    struct jsonValue value;
+};
+
+#define MAX_PAGES 4096
+#define PAGE_SIZE (256 * 1024)
+#define BIG_SIZE (1024)
 
 struct {
     char * pages[MAX_PAGES];
@@ -80,6 +111,8 @@ static int is_trailing_utf8_byte[256] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 };
 
+#ifdef NDEBUG
+
 static size_t seq_alloc_bytes_left() {
     return allocator.position
         ? allocator.pages[allocator.current_page] + PAGE_SIZE - allocator.position
@@ -94,34 +127,11 @@ static int seq_alloc_new_page() {
     for (i = 0; i < MAX_PAGES; ++i) {
         if (!allocator.pages[i]) break;
     }
-    if (i == MAX_PAGES) return 0;
+    if (i == MAX_PAGES) return 0; /* TODO: do something sane */
     allocator.current_page = i;
     allocator.counts[i] = 0;
     allocator.position = allocator.pages[i] = new_page;
     return 1;
-}
-
-static void * seq_alloc_begin_andvance_allocation() {
-    if (seq_alloc_bytes_left() < BIG_SIZE + 1) {
-        if (!seq_alloc_new_page()) return NULL;
-    }
-    ++allocator.counts[allocator.current_page];
-    *allocator.position++ = allocator.current_page;
-    allocator.andvance_allocation = 1;
-    return allocator.position;
-}
-
-static void seq_alloc_reject_advance_allocation() {
-    assert(allocator.andvance_allocation);
-    allocator.andvance_allocation = 0;
-}
-
-static void seq_alloc_perform_andvance_allocation(void * end) {
-    assert(allocator.andvance_allocation);
-    assert((void *) allocator.position < end);
-    assert((char *) end - allocator.pages[allocator.current_page] < PAGE_SIZE);
-    allocator.andvance_allocation = 0;
-    allocator.position = end;
 }
 
 static void * seq_alloc_allocate(size_t bytes) {
@@ -144,6 +154,214 @@ static void seq_alloc_free(void * memory) {
     if (--allocator.counts[i]) return;
     json_free(allocator.pages[i]);
     allocator.pages[i] = NULL;
+}
+
+static void * seq_alloc_begin_andvance_allocation() {
+    if (seq_alloc_bytes_left() < BIG_SIZE + 1) {
+        if (!seq_alloc_new_page()) return NULL;
+    }
+    ++allocator.counts[allocator.current_page];
+    *allocator.position++ = allocator.current_page;
+    allocator.andvance_allocation = 1;
+    return allocator.position;
+}
+
+static void seq_alloc_reject_advance_allocation() {
+    assert(allocator.andvance_allocation);
+    --allocator.counts[allocator.current_page];
+    allocator.andvance_allocation = 0;
+}
+
+static void seq_alloc_perform_andvance_allocation(void * end) {
+    assert(allocator.andvance_allocation);
+    assert((void *) allocator.position < end);
+    assert((char *) end - allocator.pages[allocator.current_page] < PAGE_SIZE);
+    allocator.andvance_allocation = 0;
+    allocator.position = end;
+}
+
+#else
+
+#define seq_alloc_allocate malloc
+#define seq_alloc_free free
+#define seq_alloc_begin_andvance_allocation() malloc(16*1024)
+#define seq_alloc_reject_advance_allocation()
+#define seq_alloc_perform_andvance_allocation(x)
+
+#endif
+
+const char * json_string(struct jsonString * string) {
+    return string->string;
+}
+
+extern size_t json_object_size(struct jsonObject * object) {
+    return object->size;
+}
+
+static struct jsonObject * json_object_create() {
+    struct jsonObject * object;
+    object = seq_alloc_allocate(sizeof(struct jsonObject));
+    object->nil = &object->__nil;
+    object->nil->parent = object->nil;
+    object->nil->color = BLACK;
+    object->root = object->nil;
+    object->size = 0;
+    return object;
+}
+
+#define ROTATE(left, right) \
+    struct ObjectNode * y; \
+    assert(tree->root->parent == tree->nil); \
+    assert(x->right != tree->nil); \
+    y = x->right; \
+    x->right = y->left; \
+    if (y->left != tree->nil) y->left->parent = x; \
+    y->parent = x->parent; \
+    if (x->parent == tree->nil) { \
+        tree->root = y; \
+    } else if (x == x->parent->left) { \
+        x->parent->left = y; \
+    } else { \
+        x->parent->right = y; \
+    } \
+    y->left = x; \
+    x->parent = y;
+
+static void object_node_left_rotate(struct jsonObject * tree, struct ObjectNode * x) {
+    ROTATE(left, right)
+}
+
+static void object_node_right_rotate(struct jsonObject * tree, struct ObjectNode * x) {
+    ROTATE(right, left)
+}
+
+#define FIXUP(left, right) \
+    y = z->parent->parent->right; \
+    if (y->color == RED) { \
+        z->parent->color = BLACK; \
+        y->color = BLACK; \
+        z->parent->parent->color = RED; \
+        z = z->parent->parent; \
+    } else { \
+        if (z == z->parent->right) { \
+            z = z->parent; \
+            object_node_##left##_rotate(object, z); \
+        } \
+        z->parent->color = BLACK; \
+        z->parent->parent->color = RED; \
+        object_node_##right##_rotate(object, z->parent->parent); \
+    }
+
+static void json_object_fixup(struct jsonObject * object, struct ObjectNode * z) {
+    struct ObjectNode * y;
+    while (z->parent->color == RED) {
+        if (z->parent == z->parent->parent->left) {
+            FIXUP(left, right)
+        } else {
+            FIXUP(right, left)
+        }
+    }
+    object->root->color = BLACK;
+}
+
+static int json_object_add(struct jsonObject * object, struct jsonString * key,
+        struct jsonValue value) {
+    struct ObjectNode * x;
+    struct ObjectNode * y;
+    struct ObjectNode * z;
+    z = seq_alloc_allocate(sizeof(struct ObjectNode));
+    if (!z) return 0;
+    z->key = key;
+    z->value = value;
+    y = object->nil;
+    x = object->root;
+    while (x != object->nil) {
+        y = x;
+        if (strcmp(z->key->string, x->key->string) < 0) {
+            x = x->left;
+        } else x = x->right;
+    }
+    z->parent = y;
+    if (y == object->nil) object->root = z;
+    else if (strcmp(z->key->string, y->key->string) < 0) {
+        y->left = z;
+    } else y->right = z;
+    z->left = object->nil;
+    z->right = object->nil;
+    z->color = RED;
+    json_object_fixup(object, z);
+    ++object->size;
+    return 1;
+}
+
+extern struct jsonValue json_object_get_value(struct jsonObject * object,
+        const char * key) {
+    struct ObjectNode * x;
+    struct jsonValue zero;
+    int c;
+    if (object->root != object->nil) { zero.kind = 0; return zero; }
+    x = object->root;
+    c = strcmp(key, x->key->string);
+    while (x != object->nil && c) {
+        x = c < 0 ? x->left : x->right;
+    }
+    return x->value;
+}
+
+#define MORRIS_TRAVERSAL(traverse) \
+
+#define APPLY(current)
+
+extern void json_object_for_each(struct jsonObject * object,
+        void (*action)(const char *, struct jsonValue, void *), void * user_data) {
+    struct ObjectNode * current;
+    struct ObjectNode * predecessor;
+    current = object->root;
+    while (current != object->nil) {
+        if (current->left == object->nil) {
+            predecessor = current->right;
+            action(current->key->string, current->value, user_data);
+            current = predecessor;
+        } else {
+            predecessor = current->left;
+            while (predecessor->right != object->nil && predecessor->right != current) {
+                predecessor = predecessor->right;
+            }
+            if (predecessor->right == object->nil) {
+                predecessor->right = current;
+                current = current->left;
+            } else {
+                predecessor->right = object->nil;
+                predecessor = current->right;
+                action(current->key->string, current->value, user_data);
+                current = predecessor;
+            }
+        }
+    }
+}
+
+static void json_string_free(struct jsonString * string) {
+    if (string->length < BIG_SIZE) {
+        seq_alloc_free(string->string);
+    } else {
+        json_free(string->string);
+    }
+    seq_alloc_free(string);
+}
+
+static void node_free(struct ObjectNode * node) {
+    if (node->left->parent != node->left) node_free(node->left);
+    if (node->right->parent != node->right) node_free(node->right);
+    json_string_free(node->key);
+    json_value_free(node->value);
+    seq_alloc_free(node);
+}
+
+static void json_object_free(struct jsonObject * object) {
+    if (object->root != object->nil) {
+        node_free(object->root);
+    }
+    seq_alloc_free(object);
 }
 
 /* Returns length of utf8 code point representing 'hex' unicode character. */
@@ -259,9 +477,8 @@ static int is_prefix(const char * prefix, const char * str) {
     case '"': \
         *out++ = '\0'; \
         seq_alloc_perform_andvance_allocation(out); \
+        data->extra.unescaped = unescaped; \
         ++json; \
-        data->extra.string.unescaped = unescaped; \
-        data->extra.string.length = length; \
         return json - begin; \
     case '\\': \
         ++json; \
@@ -303,10 +520,9 @@ static size_t read_string_lexeme(const char * json, struct LexemeData * data) {
     const char * begin;
     char * end;
     size_t bytes;
-    size_t length;
     int i;
     int left;
-    char * unescaped;
+    struct jsonString * unescaped;
     int mallocated;
     char * long_unescaped;
     size_t rest_length;
@@ -314,28 +530,27 @@ static size_t read_string_lexeme(const char * json, struct LexemeData * data) {
     uint32_t hex;
     begin = json;
     mallocated = 0;
-    length = 1;
-    unescaped = seq_alloc_begin_andvance_allocation();
+    unescaped = seq_alloc_allocate(sizeof(struct jsonString));
     if (!unescaped) return 0;
-    out = unescaped;
-    while (length < BIG_SIZE) READ_CODE_POINT(++length, fail1)
+    unescaped->string = seq_alloc_begin_andvance_allocation();
+    unescaped->length = 1;
+    if (!unescaped->string) return 0;
+    out = unescaped->string;
+    while (unescaped->length < BIG_SIZE) READ_CODE_POINT(++unescaped->length, fail1)
     /* Rest of code will be executed only for really long lines */
     if (!measure_string_lexeme(json, &rest_length)) goto fail1;
-    long_unescaped = json_malloc(length + rest_length);
+    long_unescaped = json_malloc(unescaped->length + rest_length);
     if (!long_unescaped) goto fail;
-    memcpy(long_unescaped, unescaped, length);
+    memcpy(long_unescaped, unescaped->string, unescaped->length);
     seq_alloc_reject_advance_allocation();
-    length += rest_length;
-    out = long_unescaped;
+    unescaped->string = long_unescaped;
+    unescaped->length += rest_length;
+    out = unescaped->string;
     while (1) READ_CODE_POINT((void) 0, fail)
 fail:
     json_free(long_unescaped);
 fail1:
-    if (length < BIG_SIZE) {
-        seq_alloc_free(unescaped);
-    } else {
-        json_free(unescaped);
-    }
+    json_string_free(data->extra.unescaped);
     return 0;
 }
 
@@ -394,151 +609,30 @@ extern size_t next_lexeme(const char * json, struct LexemeData * data) {
     }
 }
 
-/* String hash function. */
-static size_t hash(unsigned char * str) {
-    size_t hash;
-    size_t c;
-    hash = 5381;
-    while ((c = *str++)) hash = ((hash << 5) + hash) + c;
-    return hash;
-}
-
-static int json_object_grow(struct jsonObject * object);
-
-static int json_object_add_pair(struct jsonObject * object, char * key,
-        struct jsonValue value) {
-    size_t h;
-    if (3 * object->size >= 2 * object->capacity) {
-        if (!json_object_grow(object)) return 0;
-    }
-    h = hash((unsigned char *) key) % object->capacity;
-    while (object->keys[h]) {
-        if (!strcmp(key, object->keys[h])) return 0;
-        h = (h + 1) % object->capacity;
-    }
-    object->keys[h] = key;
-    object->values[h] = value;
-    ++object->size;
-    return 0;
-}
-
-static int json_object_grow(struct jsonObject * object) {
-    size_t old_capacity;
-    char ** old_keys;
-    struct jsonValue * old_values;
-    size_t i;
-    size_t keys_size;
-    size_t values_size;
-    assert(object->capacity);
-    old_capacity = object->capacity;
-    old_keys = object->keys;
-    old_values = object->values;
-    keys_size = 2 * object->capacity * sizeof(char *);
-    values_size = 2 * object->capacity * sizeof(struct jsonValue);
-    object->size = 0;
-    object->capacity *= 2;
-    object->keys = json_malloc(keys_size + values_size);
-    if (!object->keys) return 0;
-    object->values = (struct jsonValue *) ((char *) object->keys + keys_size);
-    memset(object->keys, 0, keys_size);
-    for (i = 0; i < old_capacity; ++i) {
-        if (!old_keys[i]) continue;
-        json_object_add_pair(object, old_keys[i], old_values[i]);
-    }
-    json_free(old_keys);
-    return 1;
-}
-
-/* Allocates and initializes jsonObject and returns pointer to it. Never call
-   json_object_add_pair and json_object_grow on object that was created with
-   'initial_capacity' = 0. */
-static struct jsonObject * json_object_create(size_t initial_capacity) {
-    struct jsonObject * object;
-    object = json_malloc(sizeof(struct jsonObject));
-    if (!object) return NULL;
-    object->capacity = initial_capacity;
-    object->size = 0;
-    if (!initial_capacity) {
-        object->keys = NULL;
-        object->values = NULL;
-        return object;
-    }
-    object->keys = json_malloc(initial_capacity *
-            (sizeof(char *) + sizeof(struct jsonValue)));
-    if (!object->keys) {
-        json_free(object);
-        return NULL;
-    }
-    object->values = (struct jsonValue *)((char *) object->keys +
-            initial_capacity * sizeof(char *));
-    memset(object->keys, 0, initial_capacity *
-            (sizeof(char *) + sizeof(struct jsonValue)));
-    return object;
-}
-
-/* Returns value of attribute 'key' of object 'object'. */
-extern struct jsonValue json_object_get_value(struct jsonObject * object,
-        const char * key) {
-    size_t h;
-    struct jsonValue value;
-    h = hash((unsigned char *)key) % object->capacity;
-    while (object->keys[h] && strcmp(object->keys[h], key)) {
-        h = (h + 1) % object->capacity;
-    }
-    if (object->keys[h]) return object->values[h];
-    memset(&value, 0, sizeof(struct jsonValue));
-    return value;
-}
-
-static void json_object_free(struct jsonObject * object) {
-    size_t i;
-    if (object->capacity) {
-        for (i = 0; i < object->capacity; ++i) {
-            if (!object->keys[i]) continue;
-            seq_alloc_free(object->keys[i]);
-            json_value_free(object->values[i]);
-        }
-        json_free(object->keys);
-    }
-    json_free(object);
-}
-
-/* Calls 'action' for each attribute of 'object' with its key, value and 'user_data'. */
-extern void json_object_for_each(struct jsonObject * object,
-        void (*action)(const char * key, struct jsonValue, void *), void * user_data) {
-    size_t i;
-    if (!object->size) return;
-    for (i = 0; i < object->capacity; ++i) {
-        if (!object->keys[i]) continue;
-        action(object->keys[i], object->values[i], user_data);
-    }
-}
-
 /* Parses json object and stores pointer to it into '*object'. 'json' must
    point to next lexeme after '{'. Object will be created in heap so don't
    forget to free it using json_object_free function. */
 static size_t json_parse_object(const char * json, struct jsonObject ** object) {
     const char * begin;
-    char * name;
+    struct jsonString * key;
     struct jsonValue value;
     struct LexemeData data;
     size_t bytes_read;
     begin = json;
     if (!(bytes_read = next_lexeme(json, &data))) return 0;
     json += bytes_read;
+    *object = json_object_create();
     if (data.kind == JLK_R_BRACE) {
-        *object = json_object_create(0);
         return json - begin;
     }
-    *object = json_object_create(10);
     while (1) {
         if (JLK_STRING != data.kind) goto fail2;
-        name = data.extra.string.unescaped;
+        key = data.extra.unescaped;
         if (!(bytes_read = next_lexeme(json, &data)) || JLK_COLON != data.kind) goto fail1;
         json += bytes_read;
         if (!(bytes_read = json_parse_value(json, &value))) goto fail1;
         json += bytes_read;
-        json_object_add_pair(*object, name, value);
+        json_object_add(*object, key, value);
         if (!(bytes_read = next_lexeme(json, &data))) goto fail2;
         json += bytes_read;
         if (JLK_R_BRACE == data.kind) break;
@@ -548,11 +642,15 @@ static size_t json_parse_object(const char * json, struct jsonObject ** object) 
     }
     return json - begin;
 fail1:
-    json_free(name);
+    json_string_free(key);
 fail2:
     json_object_free(*object);
     *object = NULL;
     return 0;
+}
+
+extern size_t json_array_size(struct jsonArray * array) {
+    return array->size;
 }
 
 static struct jsonArray * json_array_create() {
@@ -672,10 +770,7 @@ extern size_t json_parse_value(const char * json, struct jsonValue * value) {
         break;
     case JLK_STRING:
         ret.kind = JVK_STR;
-        ret.value.string = seq_alloc_allocate(sizeof(struct jsonString));
-        if (!ret.value.string) return 0;
-        ret.value.string->string = data.extra.string.unescaped;
-        ret.value.string->length = data.extra.string.length;
+        ret.value.string = data.extra.unescaped;
         break;
     case JLK_NUMBER:
         ret.kind = JVK_NUM;
@@ -685,15 +780,6 @@ extern size_t json_parse_value(const char * json, struct jsonValue * value) {
     }
     *value = ret;
     return json - begin;
-}
-
-static void json_string_free(struct jsonString * string) {
-    if (string->length < BIG_SIZE) {
-        seq_alloc_free(string->string);
-    } else {
-        json_free(string->string);
-    }
-    seq_alloc_free(string);
 }
 
 extern void json_value_free(struct jsonValue value) {

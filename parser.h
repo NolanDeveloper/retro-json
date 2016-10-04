@@ -3,29 +3,11 @@
  * Copy if you can.
  */
 
-struct jsonValue;
-
-struct jsonObject {
-    char ** keys;
-    struct jsonValue * values;
-    size_t size;
-    size_t capacity;
-};
-
-struct jsonArrayNode;
-
-struct jsonArray {
-    struct jsonArrayNode * first;
-    struct jsonArrayNode * last;
-    size_t size;
-};
+struct jsonObject;
+struct jsonArray;
+struct jsonString;
 
 enum jsonValueKind { JVK_STR = 1, JVK_NUM, JVK_OBJ, JVK_ARR, JVK_BOOL, JVK_NULL };
-
-struct jsonString {
-    char * string;
-    size_t length;
-};
 
 struct jsonValue {
     enum jsonValueKind kind;
@@ -38,10 +20,7 @@ struct jsonValue {
     } value;
 };
 
-struct jsonArrayNode {
-    struct jsonArrayNode * next;
-    struct jsonValue value;
-};
+const char * json_string(struct jsonString * string);
 
 /* Parses json value from string pointed by 'json' into variable pointed by 'value'.
    Returns number of bytes read. */
@@ -49,6 +28,8 @@ size_t json_parse_value(const char * json, struct jsonValue * value);
 
 /* Free memory held by by value. */
 void json_value_free(struct jsonValue value);
+
+size_t json_object_size(struct jsonObject * object);
 
 /* If 'object' has attribute 'key' retuns its value otherwise returns jsonValue with
    kind set to 0. */
@@ -58,6 +39,8 @@ struct jsonValue json_object_get_value(struct jsonObject * object, const char * 
    attribute and 'user_data'. */
 void json_object_for_each(struct jsonObject * object,
         void (*action)(const char *, struct jsonValue, void *), void * user_data);
+
+size_t json_array_size(struct jsonArray * array);
 
 /* Traverses 'array' and calls 'action' for each value with index of the value,
    value itself and 'user_data'. */

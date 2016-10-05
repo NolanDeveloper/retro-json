@@ -73,6 +73,16 @@ void print_json_value(struct jsonValue value, int offset) {
 
 #define BUFFER_SIZE (4 * 1024 * 1024)
 
+int from_string() {
+    const char * json = "[ { \"name\" : \"101 (MM4)\", \"id\" : 1 } ]";
+    struct jsonValue value;
+    if (!json_parse_value(json, &value)) return 1;
+    print_json_value(value, 0);
+    json_value_free(value);
+    puts("");
+    return 0;
+}
+
 int from_stdin() {
     char * buffer = malloc(BUFFER_SIZE);
     struct jsonValue value;
@@ -86,16 +96,6 @@ int from_stdin() {
 end:
     free(buffer);
     return ret;
-}
-
-int from_string() {
-    const char * json = "[ { \"name\" : \"101 (MM4)\", \"id\" : 1 } ]";
-    struct jsonValue value;
-    if (!json_parse_value(json, &value)) return 1;
-    print_json_value(value, 0);
-    json_value_free(value);
-    puts("");
-    return 0;
 }
 
 int main() {

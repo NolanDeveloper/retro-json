@@ -67,7 +67,7 @@ struct jsonArrayNode {
 
 struct {
     char * pages[MAX_PAGES];
-    short counts[MAX_PAGES];
+    size_t counts[MAX_PAGES];
     size_t current_page;
     char * position;
     int andvance_allocation;
@@ -111,7 +111,7 @@ static int is_trailing_utf8_byte[256] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 };
 
-#ifdef NDEBUG
+#ifndef NDEBUG
 
 static size_t seq_alloc_bytes_left() {
     return allocator.position

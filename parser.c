@@ -224,6 +224,7 @@ extern size_t json_object_size(struct jsonObject * object) {
 static struct jsonObject * json_object_create() {
     struct jsonObject * object;
     object = seq_alloc_allocate(sizeof(struct jsonObject));
+    if (!object) return NULL;
     object->nil = &object->__nil;
     object->nil->parent = object->nil;
     object->nil->color = BLACK;
@@ -572,9 +573,7 @@ static size_t read_string_lexeme(const char * json, struct LexemeData * data) {
     unescaped->string = long_unescaped;
     unescaped->length += rest_length;
     out = unescaped->string;
-    while (1) {
-        READ_CODE_POINT((void) 0, fail, (void) 0)
-    }
+    while (1) READ_CODE_POINT((void) 0, fail, (void) 0)
 fail:
     json_free(long_unescaped);
 fail1:

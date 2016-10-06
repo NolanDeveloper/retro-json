@@ -3,6 +3,8 @@
  * Copy if you can.
  */
 
+/*#define NDEBUG*/
+
 #include <assert.h>
 #include <ctype.h>
 #include <inttypes.h>
@@ -50,20 +52,24 @@ struct jsonObject {
     size_t size;
 };
 
-struct jsonArray {
-    struct jsonArrayNode * first;
-    struct jsonArrayNode * last;
-    size_t size;
+#define NODE_SIZE 64
+
+struct ArrayNode {
+    struct ArrayNode * next;
+    struct jsonValue values[NODE_SIZE];
 };
 
-struct jsonArrayNode {
-    struct jsonArrayNode * next;
-    struct jsonValue value;
+struct jsonArray {
+    struct ArrayNode * first;
+    struct ArrayNode * last;
+    struct jsonValue * position;
+    struct jsonValue * node_end;
+    size_t size;
 };
 
 #define MAX_PAGES 4096
 #define PAGE_SIZE (256 * 1024)
-#define BIG_SIZE (1024)
+#define BIG_SIZE (4 * 1024)
 
 struct {
     char * pages[MAX_PAGES];
@@ -111,12 +117,25 @@ static int is_trailing_utf8_byte[256] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 };
 
-#ifndef NDEBUG
+#ifdef NDEBUG
 
 static size_t seq_alloc_bytes_left() {
     return allocator.position
         ? allocator.pages[allocator.current_page] + PAGE_SIZE - allocator.position
         : 0;
+}
+
+static size_t seq_alloc_shrink_pages() {
+    size_t i;
+    size_t o;
+    o = 0;
+    for (i = 0; i < MAX_PAGES; ++i) {
+        if (!allocator.pages[i]) continue;
+        allocator.pages[o] = allocator.pages[i];
+        allocator.counts[o] = allocator.counts[o];
+        ++o;
+    }
+    return o;
 }
 
 static int seq_alloc_new_page() {
@@ -127,7 +146,10 @@ static int seq_alloc_new_page() {
     for (i = 0; i < MAX_PAGES; ++i) {
         if (!allocator.pages[i]) break;
     }
-    if (i == MAX_PAGES) return 0; /* TODO: do something sane */
+    if (i == MAX_PAGES) {
+        i = seq_alloc_shrink_pages();
+        if (i == MAX_PAGES) return 0;
+    }
     allocator.current_page = i;
     allocator.counts[i] = 0;
     allocator.position = allocator.pages[i] = new_page;
@@ -139,9 +161,10 @@ static void * seq_alloc_allocate(size_t bytes) {
     assert(bytes + 1 < BIG_SIZE);
     assert(!allocator.andvance_allocation);
     if (seq_alloc_bytes_left() < bytes) {
-        if (!seq_alloc_new_page()) return NULL;
+        if (!seq_alloc_new_page()) return NULL; /* TODO: allocate exponentially */
     }
-    ++allocator.counts[allocator.current_page];
+    ++allocator.counts[allocator.current_page]; /* TODO: move this into
+                                                   beginning of block */
     *allocator.position++ = allocator.current_page;
     memory = allocator.position;
     allocator.position += bytes;
@@ -182,6 +205,7 @@ static void seq_alloc_perform_andvance_allocation(void * end) {
 
 #else
 
+/* It's easier to debug malloc than custom allocator. */
 #define seq_alloc_allocate malloc
 #define seq_alloc_free free
 #define seq_alloc_begin_andvance_allocation() malloc(16*1024)
@@ -472,11 +496,11 @@ static int is_prefix(const char * prefix, const char * str) {
     return *prefix;
 }
 
-#define READ_CODE_POINT(inclen, fail_lable) { \
+#define READ_CODE_POINT(inclen, fail_lable, on_success) { \
     switch (*json) { \
     case '"': \
         *out++ = '\0'; \
-        seq_alloc_perform_andvance_allocation(out); \
+        on_success; \
         data->extra.unescaped = unescaped; \
         ++json; \
         return json - begin; \
@@ -536,7 +560,10 @@ static size_t read_string_lexeme(const char * json, struct LexemeData * data) {
     unescaped->length = 1;
     if (!unescaped->string) return 0;
     out = unescaped->string;
-    while (unescaped->length < BIG_SIZE) READ_CODE_POINT(++unescaped->length, fail1)
+    while (unescaped->length < BIG_SIZE) {
+        READ_CODE_POINT(++unescaped->length, fail1,
+                seq_alloc_perform_andvance_allocation(out));
+    }
     /* Rest of code will be executed only for really long lines */
     if (!measure_string_lexeme(json, &rest_length)) goto fail1;
     long_unescaped = json_malloc(unescaped->length + rest_length);
@@ -546,7 +573,9 @@ static size_t read_string_lexeme(const char * json, struct LexemeData * data) {
     unescaped->string = long_unescaped;
     unescaped->length += rest_length;
     out = unescaped->string;
-    while (1) READ_CODE_POINT((void) 0, fail)
+    while (1) {
+        READ_CODE_POINT((void) 0, fail, (void) 0)
+    }
 fail:
     json_free(long_unescaped);
 fail1:
@@ -653,44 +682,67 @@ extern size_t json_array_size(struct jsonArray * array) {
     return array->size;
 }
 
+#include <stdio.h>
+
 static struct jsonArray * json_array_create() {
     struct jsonArray * array;
     array = seq_alloc_allocate(sizeof(struct jsonArray));
     if (!array) return 0;
-    array->size = 0;
     array->first = NULL;
     array->last = NULL;
+    array->position = NULL;
+    array->node_end = NULL;
+    array->size = 0;
     return array;
 }
 
-static int json_array_add(struct jsonArray * array, struct jsonValue value) {
-    struct jsonArrayNode * new_node;
-    new_node = seq_alloc_allocate(sizeof(struct jsonArrayNode));
+static int json_array_ensure_free_space(struct jsonArray * array) {
+    struct ArrayNode * new_node;
+    if (array->position && array->position != array->node_end) return 1;
+    new_node = seq_alloc_allocate(sizeof(struct ArrayNode));
     if (!new_node) return 0;
     new_node->next = NULL;
-    new_node->value = value;
-    if (array->size) {
+    array->position = new_node->values;
+    array->node_end = new_node->values + NODE_SIZE;
+    if (array->last) {
         array->last->next = new_node;
         array->last = new_node;
-        ++array->size;
     } else {
-        array->last = array->first = new_node;
-        array->size = 1;
+        array->first = array->last = new_node;
     }
     return 1;
 }
 
+static int json_array_add(struct jsonArray * array, struct jsonValue value) {
+    if (!json_array_ensure_free_space(array)) return 0;
+    *array->position++ = value;
+    array->size++;
+    return 1;
+}
+
 static void json_array_free(struct jsonArray * array) {
-    struct jsonArrayNode * p;
-    struct jsonArrayNode * next;
-    if (array->size) {
-        p = array->first;
-        do {
-            next = p->next;
-            json_value_free(p->value);
-            seq_alloc_free(p);
-        } while ((p = next));
+    struct ArrayNode * p;
+    struct ArrayNode * next;
+    size_t i;
+    size_t n;
+    p = array->first;
+    if (!p) {
+        seq_alloc_free(array);
+        return;
     }
+    while (p->next) {
+        for (i = 0; i < NODE_SIZE; ++i) {
+            json_value_free(p->values[i]);
+        }
+        next = p->next;
+        seq_alloc_free(p);
+        p = next;
+    }
+    n = array->position - p->values;
+    for (i = 0; i < n; ++i) {
+        json_value_free(p->values[i]);
+    }
+    seq_alloc_free(p);
     seq_alloc_free(array);
 }
 
@@ -698,13 +750,22 @@ static void json_array_free(struct jsonArray * array) {
    'user_data'. */
 extern void json_array_for_each(struct jsonArray * array,
         void (*action)(size_t, struct jsonValue, void *), void * user_data) {
-    struct jsonArrayNode * p;
+    struct ArrayNode * p;
     size_t i;
-    p = array->first;
-    i = 0;
-    while (p) {
-        action(i++, p->value, user_data);
-        p = p->next;
+    size_t j;
+    size_t k;
+    size_t n;
+    size_t number_of_nodes;
+    k = 0;
+    if (!(p = array->first)) return;
+    number_of_nodes = (array->size + NODE_SIZE - 1) / NODE_SIZE;
+    for (i = 0; i < number_of_nodes; ++i, p = p->next) {
+        n = i == (number_of_nodes - 1)
+            ? array->position - p->values
+            : NODE_SIZE;
+        for (j = 0; j < n; ++j) {
+            action(k++, p->values[j], user_data);
+        }
     }
 }
 

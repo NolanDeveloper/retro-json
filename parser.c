@@ -332,10 +332,6 @@ extern struct jsonValue json_object_get_value(struct jsonObject * object,
     return x->value;
 }
 
-#define MORRIS_TRAVERSAL(traverse) \
-
-#define APPLY(current)
-
 extern void json_object_for_each(struct jsonObject * object,
         void (*action)(const char *, struct jsonValue, void *), void * user_data) {
     struct ObjectNode * current;

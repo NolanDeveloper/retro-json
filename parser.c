@@ -161,10 +161,9 @@ static void * seq_alloc_allocate(size_t bytes) {
     assert(bytes + 1 < BIG_SIZE);
     assert(!allocator.andvance_allocation);
     if (seq_alloc_bytes_left() < bytes) {
-        if (!seq_alloc_new_page()) return NULL; /* TODO: allocate exponentially */
+        if (!seq_alloc_new_page()) return NULL;
     }
-    ++allocator.counts[allocator.current_page]; /* TODO: move this into
-                                                   beginning of block */
+    ++allocator.counts[allocator.current_page];
     *allocator.position++ = allocator.current_page;
     memory = allocator.position;
     allocator.position += bytes;

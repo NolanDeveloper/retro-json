@@ -3,7 +3,7 @@
  * Copy if you can.
  */
 
-/*#define NDEBUG*/
+#define NDEBUG
 
 #include <assert.h>
 #include <ctype.h>

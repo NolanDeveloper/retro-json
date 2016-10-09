@@ -13,14 +13,11 @@ struct int_pair {
     int second;
 };
 
-void * (*json_malloc)(size_t) = malloc;
-void (*json_free)(void *) = free;
-
 void print_offset(int offset) { int i; for (i = 0; i < offset; ++i) printf("    "); }
 
-void print_json_value(struct jsonValue value, int offset);
+void print_json_value(struct jsonValue * value, int offset);
 
-void print_json_pair(const char * key, struct jsonValue value, void * user_data) {
+void print_json_pair(const char * key, struct jsonValue * value, void * user_data) {
     struct int_pair * p = user_data;
     if (p->first) printf(",\n");
     print_offset(p->second + 1);
@@ -40,7 +37,7 @@ void print_json_object(struct jsonObject * object, int offset) {
     printf("}");
 }
 
-void print_json_value_in_array(size_t i, struct jsonValue value, void * user_data) {
+void print_json_value_in_array(size_t i, struct jsonValue * value, void * user_data) {
     void * (*p)[2] = user_data;
     int * offset = (*p)[0];
     struct jsonArray * array = (*p)[1];
@@ -60,39 +57,45 @@ void print_json_array(struct jsonArray * array, int offset) {
     printf("]");
 }
 
-void print_json_value(struct jsonValue value, int offset) {
-    switch (value.kind) {
-    case JVK_STR:  printf("\"%s\"", json_string(value.value.string));   break;
-    case JVK_NUM:  printf("%f", value.value.number);               break;
-    case JVK_OBJ:  print_json_object(value.value.object, offset);  break;
-    case JVK_ARR:  print_json_array(value.value.array, offset);    break;
-    case JVK_BOOL: printf(value.value.boolean ? "true" : "false"); break;
-    case JVK_NULL: printf("null");                                 break;
+void print_json_value(struct jsonValue * value, int offset) {
+    switch (json_value_kind(value)) {
+    case JVK_STR:  printf("\"%s\"", json_string_data(json_value_string(value))); break;
+    case JVK_NUM:  printf("%f", json_value_number(value));               break;
+    case JVK_OBJ:  print_json_object(json_value_object(value), offset);  break;
+    case JVK_ARR:  print_json_array(json_value_array(value), offset);    break;
+    case JVK_BOOL: printf(json_value_bool(value) ? "true" : "false");    break;
+    case JVK_NULL: printf("null");                                       break;
+    default: break;
     }
 }
 
 #define BUFFER_SIZE (4 * 1024 * 1024)
 
 int from_string() {
-    const char * json = "[ { \"name\" : \"101 (MM4)\", \"id\" : 1 } ]";
-    struct jsonValue value;
-    if (!json_parse_value(json, &value)) return 1;
-    print_json_value(value, 0);
-    json_value_free(value);
+    const char * json;
+    struct jsonDocument * document;
+    json = "[ { \"name\" : \"101 (MM4)\", \"id\" : 1 } ]";
+    document = json_parse(json);
+    if (!document) return 0;
+    print_json_value(json_document_value(document), 0);
     puts("");
+    json_document_free(document);
     return 0;
 }
 
 int from_stdin() {
-    char * buffer = malloc(BUFFER_SIZE);
-    struct jsonValue value;
-    size_t bytes_read = fread(buffer, sizeof(char), BUFFER_SIZE, stdin);
+    char * buffer;
+    struct jsonDocument * document;
+    size_t bytes_read;
     int ret = 0;
+    buffer = malloc(BUFFER_SIZE);
+    bytes_read = fread(buffer, sizeof(char), BUFFER_SIZE, stdin);
     if (bytes_read == BUFFER_SIZE) { ret = 1; goto end; }
-    if (!json_parse_value(buffer, &value)) { ret = 1; goto end; }
-    print_json_value(value, 0);
-    puts("");
-    json_value_free(value);
+    document = json_parse(buffer);
+    if (!document) { ret = 1; goto end; }
+    /*print_json_value(json_document_value(document), 0);*/
+    /*puts("");*/
+    json_document_free(document);
 end:
     free(buffer);
     return ret;

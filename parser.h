@@ -3,50 +3,39 @@
  * Copy if you can.
  */
 
+struct jsonString;
 struct jsonObject;
 struct jsonArray;
-struct jsonString;
+struct jsonValue;
+struct jsonDocument;
 
-enum jsonValueKind { JVK_STR = 1, JVK_NUM, JVK_OBJ, JVK_ARR, JVK_BOOL, JVK_NULL };
+enum jsonValueKind { JVK_STR, JVK_NUM, JVK_OBJ, JVK_ARR, JVK_BOOL, JVK_NULL, JVK_ERROR };
 
-struct jsonValue {
-    enum jsonValueKind kind;
-    union {
-        double number;
-        struct jsonString * string;
-        struct jsonObject * object;
-        struct jsonArray * array;
-        int boolean;
-    } value;
-};
+/* String */
+size_t json_string_length(struct jsonString * string);
+const char * json_string_data(struct jsonString * string);
 
-const char * json_string(struct jsonString * string);
-
-/* Parses json value from string pointed by 'json' into variable pointed by 'value'.
-   Returns number of bytes read. */
-size_t json_parse_value(const char * json, struct jsonValue * value);
-
-/* Free memory held by by value. */
-void json_value_free(struct jsonValue value);
-
+/* Object */
 size_t json_object_size(struct jsonObject * object);
-
-/* If 'object' has attribute 'key' retuns its value otherwise returns jsonValue with
-   kind set to 0. */
-struct jsonValue json_object_get_value(struct jsonObject * object, const char * key);
-
-/* Traverses 'object' and calls 'action' for each attribute with key, value of
-   attribute and 'user_data'. */
+struct jsonValue * json_object_at(struct jsonObject * object, const char * key);
 void json_object_for_each(struct jsonObject * object,
-        void (*action)(const char *, struct jsonValue, void *), void * user_data);
+        void (*action)(const char *, struct jsonValue *, void *), void * user_data);
 
+/* Array */
 size_t json_array_size(struct jsonArray * array);
-
-/* Traverses 'array' and calls 'action' for each value with index of the value,
-   value itself and 'user_data'. */
 void json_array_for_each(struct jsonArray * array,
-        void (*action)(size_t, struct jsonValue, void *), void * user_data);
+        void (*action)(size_t, struct jsonValue *, void *), void * user_data);
 
-/* Library user must define these variables. */
-extern void * (*json_malloc)(size_t);
-extern void (*json_free)(void *);
+/* Value */
+enum jsonValueKind json_value_kind(struct jsonValue * value);
+struct jsonString * json_value_string(struct jsonValue * value);
+double json_value_number(struct jsonValue * value);
+struct jsonObject * json_value_object(struct jsonValue * value);
+struct jsonArray * json_value_array(struct jsonValue * value);
+int json_value_bool(struct jsonValue * value);
+
+/* Document */
+struct jsonDocument * json_parse(const char * json);
+struct jsonValue * json_document_value(struct jsonDocument * document);
+void json_document_free(struct jsonDocument * document);
+

@@ -13,8 +13,6 @@
 
 #define INITIAL_CAPACITY (16)
 
-#define STRING_SIZE(capacity) (sizeof(struct jsonString) + capacity)
-
 extern size_t json_string_length(struct jsonString * string) {
     return string->size;
 }

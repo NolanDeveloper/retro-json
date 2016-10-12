@@ -1,3 +1,8 @@
+/*
+ * author: Nolan <sullen.goose@gmail.com>
+ * license: license.terms
+ */
+
 #include <stddef.h>
 #include <assert.h>
 

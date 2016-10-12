@@ -1,4 +1,5 @@
-CFLAGS += -std=c89 -Wall -Wextra -pedantic -Werror
+CC = gcc
+CFLAGS += -std=c89 -Wall -Wextra -pedantic -Werror -msse4.2
 LDFLAGS := -L.
 LDLIBS := -ljson_sgp
 

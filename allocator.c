@@ -1,3 +1,9 @@
+/*
+ * author: Nolan <sullen.goose@gmail.com>
+ * license: license.terms
+ */
+
+#include <stddef.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
@@ -20,7 +26,6 @@ static void std_free(void * mem) {
 struct Chunk {
     struct Chunk * next;
     struct Chunk * prev;
-    size_t size;
     size_t capacity;
     void * memory;
 };
@@ -28,9 +33,11 @@ struct Chunk {
 struct StackAllocator {
     struct Chunk * first;
     struct Chunk * last;
+    char * cur;
+    char * end;
 };
 
-#define CHUNK_MIN_SIZE (16 * 1024)
+#define CHUNK_MIN_SIZE (2 * 1024)
 
 static struct Chunk * chunk_create(size_t size) {
     struct Chunk * c;
@@ -38,7 +45,6 @@ static struct Chunk * chunk_create(size_t size) {
     if (!c) return 0;
     c->next = NULL;
     c->prev = NULL;
-    c->size = 0;
     c->capacity = size;
     c->memory = c + 1;
     return c;
@@ -58,19 +64,21 @@ static int stack_new_chunk(struct StackAllocator * a, size_t size) {
     } else {
         a->last = a->first = new_chunk;
     }
+    a->cur = a->last->memory;
+    a->end = (char *) a->last->memory + size;
     return 1;
 }
 
 static int stack_ensure_has_free_space(struct StackAllocator * a, size_t size) {
-    if (a->last && a->last->capacity - a->last->size > size) return 1;
+    if (a->end - a->cur > (ptrdiff_t) size) return 1;
     return stack_new_chunk(a, size);
 }
 
 static void * stack_malloc(struct StackAllocator * a, size_t size) {
     void * allocated;
     if (!stack_ensure_has_free_space(a, size)) return NULL;
-    allocated = (char *)a->last->memory + a->last->size;
-    a->last->size += size;
+    allocated = a->cur;
+    a->cur = a->cur + size;
     return allocated;
 }
 
@@ -78,28 +86,28 @@ static void * stack_realloc(struct StackAllocator * a,
         void * mem, size_t old_size, size_t new_size) {
     assert(a->last);
     /* Mem must be on top of stack */
-    assert((char *)mem + old_size == (char *)a->last->memory + a->last->size);
+    assert((char *)mem + old_size == a->cur);
     /* If is shrinking */
     if (old_size >= new_size) {
-        a->last->size -= old_size - new_size;
+        a->cur = a->cur - old_size + new_size;
         return mem;
     /* If last chunk is big enough to fit new size */
-    } else if (a->last->capacity - a->last->size >= new_size - old_size) {
-        a->last->size += new_size - old_size;
+    } else if (a->end - a->cur >= (ptrdiff_t)(new_size - old_size)) {
+        a->cur = a->cur - old_size + new_size;
         return mem;
     } else {
         if (!stack_new_chunk(a, new_size)) return NULL;
         memcpy(a->last->memory, mem, old_size);
-        a->last->size += new_size;
+        a->cur = a->cur + new_size;
         return a->last->memory;
     }
 }
 
 /* Stack allocator can only free memory in order reverse to order of allocation. */
 static void stack_free(struct StackAllocator * a, void * mem, size_t size) {
-    assert((char *)mem + size == (char *)a->last->memory + a->last->size);
+    assert((char *)mem + size == a->cur);
     (void) mem;
-    a->last->size -= size;
+    a->cur = a->cur - size;
 }
 
 extern void * alloc_malloc(struct allocAllocator * a, size_t size) {
@@ -126,6 +134,8 @@ extern struct allocAllocator * get_stack_allocator() {
     if (!a) return NULL;
     a->first = NULL;
     a->last = NULL;
+    a->end = NULL;
+    a->cur = NULL;
     return (struct allocAllocator *)a;
 }
 

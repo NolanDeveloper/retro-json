@@ -1,6 +1,6 @@
 /*
  * author: Nolan <sullen.goose@gmail.com>
- * Copy if you can.
+ * license: license.terms
  */
 
 #include <assert.h>
@@ -14,10 +14,20 @@
 #include "json_string.h"
 #include "json_array.h"
 #include "json_object.h"
+#include "string_to_double.h"
 
-#define ALLOCATOR AK_STACK
+#define ALLOCATOR AK_STACK /* AK_STD */
 
-#define FAIL { return 0; }
+#ifndef NDEBUG
+
+void fail() { } /* useful for backtrace */
+#define FAIL { fail(); return 0; }
+
+#else
+
+#define FAIL return 0;
+
+#endif
 
 enum LexemeKind {
     JLK_OBJ_BEG, JLK_OBJ_END, JLK_ARR_BEG, JLK_ARR_END, JLK_COMMA, JLK_COLON,
@@ -127,8 +137,6 @@ extern void json_document_free(struct jsonDocument * document) {
     alloc_free_allocator(AK_STACK, document->allocator);
 }
 
-/* Writes code point representing 'hex' unicode character into 'out' and returns
-   pointer to first byte after written code point. */
 static void put_utf8_code_point(int32_t hex, struct jsonString * unescaped,
         struct allocAllocator * allocator) {
     if (hex <= 0x007f) {
@@ -142,19 +150,6 @@ static void put_utf8_code_point(int32_t hex, struct jsonString * unescaped,
         json_string_append(unescaped, allocator, (char) (0x80 | (hex & 0x3f)));
     }
 }
-
-#define SINGLE_CHAR_LEXEME(c, k) \
-    case (c): \
-        ++json; \
-        data->kind = (k); \
-        return json - begin;
-
-#define CONCRETE_WORD_LEXEME(c, w, k) \
-    case (c):  \
-        if (is_prefix((w), json)) return 0; \
-        json += sizeof(w) - 1; \
-        data->kind = (k); \
-        return json - begin;
 
 #define SKIPWS while (isspace(*json)) ++json
 
@@ -210,9 +205,6 @@ static size_t parse_string(struct allocAllocator * allocator,
     }
 }
 
-/* Parses json object and stores pointer to it into '*object'. 'json' must
-   point to next lexeme after '{'. Object will be created in heap so don't
-   forget to free it using json_object_free function. */
 static size_t parse_object(struct allocAllocator * allocator,
         const char * json, struct jsonObject * object) {
     const char * begin;
@@ -241,7 +233,6 @@ static size_t parse_object(struct allocAllocator * allocator,
     return json - begin;
 }
 
-/* Parses json array. 'json' must point to next lexeme after '['. Don't forget to free. */
 static size_t parse_array(struct allocAllocator * allocator,
         const char * json, struct jsonArray * array) {
     const char * begin;
@@ -278,28 +269,24 @@ static size_t parse_value_array(struct allocAllocator * allocator, const char * 
     return parse_array(allocator, json, &value->value.array);
 }
 
-/* Returns non zero value if 'prefix' is prefix of 'str' and 0 otherwise. */
-static int is_prefix(const char * prefix, const char * str) {
-    while (*prefix && *str && *prefix++ == *str++);
-    return !*prefix;
-}
+#define is_not_prefix(pref, str) (strncmp((pref), (str), sizeof(pref) - 1))
 
 static size_t parse_value_true(const char * json, struct jsonValue * value) {
-    if (!is_prefix("true", json)) FAIL;
+    if (is_not_prefix("true", json)) FAIL;
     value->kind = JVK_BOOL;
     value->value.boolean = 1;
     return 4;
 }
 
 static size_t parse_value_false(const char * json, struct jsonValue * value) {
-    if (!is_prefix("false", json)) FAIL;
+    if (is_not_prefix("false", json)) FAIL;
     value->kind = JVK_BOOL;
     value->value.boolean = 0;
     return 5;
 }
 
 static size_t parse_value_null(const char * json, struct jsonValue * value) {
-    if (!is_prefix("null", json)) FAIL;
+    if (is_not_prefix("null", json)) FAIL;
     value->kind = JVK_NULL;
     return 4;
 }
@@ -314,11 +301,10 @@ static size_t parse_value_string(struct allocAllocator * allocator, const char *
 static size_t parse_value_number(const char * json, struct jsonValue * value) {
     char * end;
     value->kind = JVK_NUM;
-    value->value.number = strtod(json, &end);
+    value->value.number = string_to_double(json, &end);
     return end - json;
 }
 
-/* Parses json value into 'value'. Don't forget to call json_value_free.  */
 static size_t parse_value(struct allocAllocator * allocator,
         const char * json, struct jsonValue * value) {
     const char * begin;

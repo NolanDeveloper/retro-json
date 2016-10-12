@@ -1,4 +1,3 @@
-/* Value is located next to TreeNode in memory */
 struct TreeNode {
     struct TreeNode * left;
     struct TreeNode * right;

@@ -1,8 +1,3 @@
-/*
- * author: Nolan <sullen.goose@gmail.com>
- * Copy if you can.
- */
-
 struct jsonString;
 struct jsonObject;
 struct jsonArray;

@@ -1,0 +1,8 @@
+release/*
+!release/makefile
+debug/*
+!debug/makefile
+*.dep
+*.o
+.*
+!.gitignore

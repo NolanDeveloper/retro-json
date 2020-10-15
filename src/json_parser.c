@@ -124,7 +124,7 @@ extern void json_value_free_internal(struct jsonValue * value) {
     json_free(value);
 }
 
-static void put_utf8_code_point(int32_t hex, struct jsonString * unescaped) {
+static void append_unicode_code_point(struct jsonString * unescaped, int32_t hex) {
     if (hex <= 0x007f) {
         json_string_append(unescaped, (char) hex);
     } else if (0x0080 <= hex && hex <= 0x07ff) {
@@ -174,7 +174,7 @@ static size_t parse_string(const char * json, struct jsonString * string) {
                 if (!buf[3]) { FAIL(); return 0; } /* \uXXXX - not enought X */
                 hex = strtoul(buf, &end, 16);
                 json += 4;
-                put_utf8_code_point(hex, string);
+                append_unicode_code_point(string, hex);
                 break;
             default: FAIL(); return 0;
             }

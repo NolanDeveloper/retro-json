@@ -1,22 +1,15 @@
-/*
- * author: Nolan <sullen.goose@gmail.com>
- * license: license.terms
- */
-
 #include <stddef.h>
 #include <assert.h>
+#include <stdlib.h>
 
-#include "allocator.h"
-#include "parser.h"
+#include "json_parser.h"
 #include "json_array.h"
-
 
 extern size_t json_array_size(struct jsonArray * array) {
     return array->size;
 }
 
-extern void json_array_for_each(struct jsonArray * array,
-        void (*action)(size_t, struct jsonValue *, void *), void * user_data) {
+extern void json_array_for_each(struct jsonArray * array, jsonArrayVisitor action, void * user_data) {
     struct ArrayNode * node;
     size_t i;
     i = 0;
@@ -33,20 +26,33 @@ extern void json_array_init(struct jsonArray * array) {
     array->size = 0;
 }
 
-static struct ArrayNode * array_node_create(struct jsonValue * value,
-        struct allocAllocator * allocator) {
+extern void json_array_free_internal(struct jsonArray * array) {
+    struct ArrayNode * node, * next;
+    if (!array) return;
+    node = array->first;
+    while (node) {
+        next = node->next;
+        json_value_free(node->value);
+        json_free(node);
+        node = next;
+    }
+    array->first = NULL;
+    array->last = NULL;
+    array->size = 0;
+}
+
+static struct ArrayNode * array_node_create(struct jsonValue * value) {
     struct ArrayNode * node;
-    node = alloc_malloc(allocator, sizeof(struct ArrayNode));
+    node = json_malloc(sizeof(struct ArrayNode));
     if (!node) return NULL;
     node->value = value;
     node->next = NULL;
     return node;
 }
 
-extern int json_array_add(struct jsonArray * array,
-        struct allocAllocator * allocator, struct jsonValue * value) {
+extern int json_array_add(struct jsonArray * array, struct jsonValue * value) {
     struct ArrayNode * new_node;
-    new_node = array_node_create(value, allocator);
+    new_node = array_node_create(value);
     if (!new_node) return 0;
     if (array->last) {
         assert(array->first);

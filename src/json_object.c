@@ -1,14 +1,9 @@
-/*
- * author: Nolan <sullen.goose@gmail.com>
- * license: license.terms
- */
-
 #include <stddef.h>
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 
-#include "allocator.h"
-#include "parser.h"
+#include "json_parser.h"
 #include "json_string.h"
 #include "json_object.h"
 
@@ -16,6 +11,8 @@ extern size_t json_object_size(struct jsonObject * object) {
     return object->size;
 }
 
+/* TODO: looks like this function shouldn't work at all */
+/* FIXME: strcmp is called only once */
 extern struct jsonValue * json_object_at(struct jsonObject * object, const char * key) {
     struct TreeNode * x;
     int c;
@@ -28,8 +25,7 @@ extern struct jsonValue * json_object_at(struct jsonObject * object, const char 
     return x->value;
 }
 
-extern void json_object_for_each(struct jsonObject * object,
-        void (*action)(const char *, struct jsonValue *, void *), void * user_data) {
+extern void json_object_for_each(struct jsonObject * object, jsonObjectVisitor action, void * user_data) {
     struct TreeNode * current;
     struct TreeNode * predecessor;
     current = object->root;
@@ -61,6 +57,23 @@ extern void json_object_init(struct jsonObject * object) {
     object->nil->parent = object->nil;
     object->nil->color = BLACK;
     object->root = object->nil;
+    object->size = 0;
+}
+
+static void tree_free(struct TreeNode * tree) {
+    if (!tree || tree == tree->parent) return;
+    json_value_free(tree->value);
+    json_string_free_internal(tree->key);
+    json_free(tree->key);
+    tree_free(tree->left);
+    tree_free(tree->right);
+    json_free(tree);
+}
+
+extern void json_object_free_internal(struct jsonObject * object) {
+    if (!object) return;
+    tree_free(object->root);
+    object->root = NULL;
     object->size = 0;
 }
 
@@ -119,20 +132,18 @@ static void tree_fixup(struct jsonObject * object, struct TreeNode * z) {
     object->root->color = BLACK;
 }
 
-static struct TreeNode * create_node(struct allocAllocator * allocator,
-        struct jsonString * key, struct jsonValue * value) {
+static struct TreeNode * create_node(struct jsonString * key, struct jsonValue * value) {
     struct TreeNode * node;
-    node = alloc_malloc(allocator, sizeof(struct TreeNode));
+    node = json_malloc(sizeof(struct TreeNode));
     if (!node) return NULL;
     node->key = key;
     node->value = value;
     return node;
 }
 
-extern int json_object_add(struct jsonObject * object, struct allocAllocator * allocator,
-        struct jsonString * key, struct jsonValue * value) {
+extern int json_object_add(struct jsonObject * object, struct jsonString * key, struct jsonValue * value) {
     struct TreeNode * x, * y, * z;
-    z = create_node(allocator, key, value);
+    z = create_node(key, value);
     if (!z) return 0;
     y = object->nil;
     x = object->root;
@@ -154,4 +165,3 @@ extern int json_object_add(struct jsonObject * object, struct allocAllocator * a
     ++object->size;
     return 1;
 }
-

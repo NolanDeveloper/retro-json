@@ -1,0 +1,7 @@
+* Add parsing error message(line, offset). This should be optional as often
+  error message is not required.
+* In parser and in all procedures working with Objects recurstion depth must be limited.
+* Implement arrays on actual arrays.
+* Implement json object as hashmap with linear probing.
+* Create test for memory leaks.
+

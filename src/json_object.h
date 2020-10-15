@@ -17,6 +17,5 @@ struct jsonObject {
 };
 
 void json_object_init(struct jsonObject * object);
-int json_object_add(struct jsonObject * object, struct allocAllocator * allocator,
-        struct jsonString * key, struct jsonValue * value);
-
+void json_object_free_internal(struct jsonObject * object);
+int json_object_add(struct jsonObject * object, struct jsonString * key, struct jsonValue * value);

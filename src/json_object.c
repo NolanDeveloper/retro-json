@@ -3,165 +3,103 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "json_parser.h"
-#include "json_string.h"
-#include "json_object.h"
+#include "json.h"
+#include "json_internal.h"
 
-extern size_t json_object_size(struct jsonObject * object) {
-    return object->size;
-}
+#define INITIAL_CAPACITY 16
 
-/* TODO: looks like this function shouldn't work at all */
-/* FIXME: strcmp is called only once */
 extern struct jsonValue * json_object_at(struct jsonObject * object, const char * key) {
-    struct TreeNode * x;
-    int c;
-    if (object->root != object->nil) return NULL;
-    x = object->root;
-    c = strcmp(key, x->key->data);
-    while (x != object->nil && c) {
-        x = c < 0 ? x->left : x->right;
-    }
-    return x->value;
-}
-
-extern void json_object_for_each(struct jsonObject * object, jsonObjectVisitor action, void * user_data) {
-    struct TreeNode * current;
-    struct TreeNode * predecessor;
-    current = object->root;
-    while (current != object->nil) {
-        if (current->left == object->nil) {
-            predecessor = current->right;
-            action(current->key->data, current->value, user_data);
-            current = predecessor;
-        } else {
-            predecessor = current->left;
-            while (predecessor->right != object->nil && predecessor->right != current) {
-                predecessor = predecessor->right;
-            }
-            if (predecessor->right == object->nil) {
-                predecessor->right = current;
-                current = current->left;
-            } else {
-                predecessor->right = object->nil;
-                predecessor = current->right;
-                action(current->key->data, current->value, user_data);
-                current = predecessor;
-            }
+    struct jsonObjectEntry * entry, * fence;
+    unsigned hash;
+    if (!object->capacity || !object->size) return NULL;
+    hash = json_string_hash(key);
+    fence = &object->entries[object->capacity];
+    for (entry = &object->entries[hash % object->capacity]; entry->key; ++entry) {
+        if (entry == fence) {
+            entry = object->entries;
+        }
+        if (entry->key->hash == hash && !strcmp(entry->key->data, key)) {
+            break;
         }
     }
+    return entry->value;
 }
 
 extern void json_object_init(struct jsonObject * object) {
-    object->nil = &object->__nil;
-    object->nil->parent = object->nil;
-    object->nil->color = BLACK;
-    object->root = object->nil;
-    object->size = 0;
-}
-
-static void tree_free(struct TreeNode * tree) {
-    if (!tree || tree == tree->parent) return;
-    json_value_free(tree->value);
-    json_string_free_internal(tree->key);
-    json_free(tree->key);
-    tree_free(tree->left);
-    tree_free(tree->right);
-    json_free(tree);
+    object->capacity = 0;
+    object->size     = 0;
+    object->entries  = NULL;
+    object->first    = NULL;
+    object->last     = NULL;
 }
 
 extern void json_object_free_internal(struct jsonObject * object) {
+    struct jsonObjectEntry * entry;
     if (!object) return;
-    tree_free(object->root);
-    object->root = NULL;
+    entry = object->first;
+    while (entry) {
+        json_string_free_internal(entry->key);
+        json_free(entry->key);
+        json_value_free(entry->value);
+        entry = entry->next;
+    }
+    json_free(object->entries);
+    json_object_init(object);
+}
+
+static int json_object_ensure_has_free_space(struct jsonObject * object) {
+    struct jsonObjectEntry * old_entries, * first;
+    if (!object) return 0;
+    if (!object->entries) {
+        object->entries = json_calloc(INITIAL_CAPACITY * sizeof(struct jsonObjectEntry));
+        if (!object->entries) return 0;
+        object->capacity = INITIAL_CAPACITY;
+        return 1;
+    }
+    if ((object->size + 1) * 3 / 2 < object->capacity) {
+        return 1;
+    }
+    object->capacity *= 2;
+    old_entries = object->entries;
+    object->entries = json_calloc(object->capacity * sizeof(struct jsonObjectEntry));
+    if (!object->entries) return 0;
+    first = object->first;
+    object->first = object->last = NULL;
     object->size = 0;
-}
-
-#define ROTATE(left, right) \
-    struct TreeNode * y; \
-    assert(object->root->parent == object->nil); \
-    assert(x->right != object->nil); \
-    y = x->right; \
-    x->right = y->left; \
-    if (y->left != object->nil) y->left->parent = x; \
-    y->parent = x->parent; \
-    if (x->parent == object->nil) { \
-        object->root = y; \
-    } else if (x == x->parent->left) { \
-        x->parent->left = y; \
-    } else { \
-        x->parent->right = y; \
-    } \
-    y->left = x; \
-    x->parent = y;
-
-static void node_left_rotate(struct jsonObject * object, struct TreeNode * x) {
-    ROTATE(left, right)
-}
-
-static void node_right_rotate(struct jsonObject * object, struct TreeNode * x) {
-    ROTATE(right, left)
-}
-
-#define FIXUP(left, right) \
-    y = z->parent->parent->right; \
-    if (y->color == RED) { \
-        z->parent->color = BLACK; \
-        y->color = BLACK; \
-        z->parent->parent->color = RED; \
-        z = z->parent->parent; \
-    } else { \
-        if (z == z->parent->right) { \
-            z = z->parent; \
-            node_##left##_rotate(object, z); \
-        } \
-        z->parent->color = BLACK; \
-        z->parent->parent->color = RED; \
-        node_##right##_rotate(object, z->parent->parent); \
+    while (first) {
+        assert(json_object_add(object, first->key, first->value));
+        first = first->next;
     }
-
-static void tree_fixup(struct jsonObject * object, struct TreeNode * z) {
-    struct TreeNode * y;
-    while (z->parent->color == RED) {
-        if (z->parent == z->parent->parent->left) {
-            FIXUP(left, right)
-        } else {
-            FIXUP(right, left)
-        }
-    }
-    object->root->color = BLACK;
-}
-
-static struct TreeNode * create_node(struct jsonString * key, struct jsonValue * value) {
-    struct TreeNode * node;
-    node = json_malloc(sizeof(struct TreeNode));
-    if (!node) return NULL;
-    node->key = key;
-    node->value = value;
-    return node;
+    json_free(old_entries);
+    return 1;
 }
 
 extern int json_object_add(struct jsonObject * object, struct jsonString * key, struct jsonValue * value) {
-    struct TreeNode * x, * y, * z;
-    z = create_node(key, value);
-    if (!z) return 0;
-    y = object->nil;
-    x = object->root;
-    while (x != object->nil) {
-        y = x;
-        if (strcmp(z->key->data, x->key->data) < 0) {
-            x = x->left;
-        } else x = x->right;
+    struct jsonObjectEntry * entry, * fence;
+    if (!object || !key || !value) return 0; 
+    if (!json_object_ensure_has_free_space(object)) return 0;
+    fence = &object->entries[object->capacity];
+    entry = &object->entries[key->hash % object->capacity]; 
+    while (entry->key) {
+        if (entry->key->hash == key->hash && !strcmp(entry->key->data, key->data)) {
+            return 0;
+        }
+        if (++entry == fence) {
+            entry = object->entries;
+        }
     }
-    z->parent = y;
-    if (y == object->nil) object->root = z;
-    else if (strcmp(z->key->data, y->key->data) < 0) {
-        y->left = z;
-    } else y->right = z;
-    z->left = object->nil;
-    z->right = object->nil;
-    z->color = RED;
-    tree_fixup(object, z);
+    entry->key = key;
+    entry->value = value;
+    if (object->last) {
+        object->last->next = entry;
+        entry->prev = object->last;
+        object->last = entry;
+    } else {
+        object->first = object->last = entry;
+        entry->prev = NULL;
+    }
+    entry->next = NULL;
     ++object->size;
     return 1;
 }
+

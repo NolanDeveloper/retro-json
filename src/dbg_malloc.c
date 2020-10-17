@@ -68,6 +68,20 @@ void * dbg_malloc(size_t size, const char * file, int line) {
     return block->memory;
 }
 
+void * dbg_calloc(size_t size, const char * file, int line) {
+    void * p;
+    struct Block * block;
+    p = calloc(sizeof(struct Block) + size - 1, 1);
+    if (!p) return NULL;
+    block = p;
+    block->file = file;
+    block->line = line;
+    block->index = block_index++;
+    block->size = size;
+    add_block(block);
+    return block->memory;
+}
+
 void * dbg_realloc(void * ptr, size_t size, const char * file, int line) {
     struct Block * block;
     if (!ptr) return dbg_malloc(size, file, line);

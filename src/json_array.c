@@ -2,15 +2,15 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "json_parser.h"
-#include "json_array.h"
+#include "json.h"
+#include "json_internal.h"
 
 extern size_t json_array_size(struct jsonArray * array) {
     return array->size;
 }
 
 extern void json_array_for_each(struct jsonArray * array, jsonArrayVisitor action, void * user_data) {
-    struct ArrayNode * node;
+    struct jsonArrayNode * node;
     size_t i;
     i = 0;
     node = array->first;
@@ -27,7 +27,7 @@ extern void json_array_init(struct jsonArray * array) {
 }
 
 extern void json_array_free_internal(struct jsonArray * array) {
-    struct ArrayNode * node, * next;
+    struct jsonArrayNode * node, * next;
     if (!array) return;
     node = array->first;
     while (node) {
@@ -41,9 +41,9 @@ extern void json_array_free_internal(struct jsonArray * array) {
     array->size = 0;
 }
 
-static struct ArrayNode * array_node_create(struct jsonValue * value) {
-    struct ArrayNode * node;
-    node = json_malloc(sizeof(struct ArrayNode));
+static struct jsonArrayNode * array_node_create(struct jsonValue * value) {
+    struct jsonArrayNode * node;
+    node = json_malloc(sizeof(struct jsonArrayNode));
     if (!node) return NULL;
     node->value = value;
     node->next = NULL;
@@ -51,7 +51,7 @@ static struct ArrayNode * array_node_create(struct jsonValue * value) {
 }
 
 extern int json_array_add(struct jsonArray * array, struct jsonValue * value) {
-    struct ArrayNode * new_node;
+    struct jsonArrayNode * new_node;
     new_node = array_node_create(value);
     if (!new_node) return 0;
     if (array->last) {

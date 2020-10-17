@@ -1,7 +1,4 @@
-release/*
-!release/makefile
-debug/*
-!debug/makefile
+build-*
 *.dep
 *.o
 .*

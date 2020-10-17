@@ -4,10 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "json_parser.h"
-#include "json_string.h"
-#include "json_array.h"
-#include "json_object.h"
+#include "json.h"
+#include "json_internal.h"
 
 #ifndef NDEBUG
 #include <stdio.h>
@@ -20,17 +18,6 @@ static void o_my_fail(void) { } /* useful for backtrace */
 enum LexemeKind {
     JLK_OBJ_BEG, JLK_OBJ_END, JLK_ARR_BEG, JLK_ARR_END, JLK_COMMA, JLK_COLON,
     JLK_TRUE,    JLK_FALSE,   JLK_NULL,    JLK_STRING,  JLK_NUMBER
-};
-
-struct jsonValue {
-    enum jsonValueKind kind;
-    union {
-        double number;
-        struct jsonString string;
-        struct jsonObject object;
-        struct jsonArray array;
-        int boolean;
-    } value;
 };
 
 struct LexemeData {
@@ -66,30 +53,6 @@ static int utf8_bytes_left[256] = {
     3,  3,  3,  3,  3,  3,  3,  3,  4,  4,  4,  4,  5,  5, IL, IL,
 };
 
-extern enum jsonValueKind json_value_kind(struct jsonValue * value) {
-    return value->kind;
-}
-
-extern struct jsonString * json_value_string(struct jsonValue * value) {
-    return &value->value.string;
-}
-
-extern double json_value_number(struct jsonValue * value) {
-    return value->value.number;
-}
-
-extern struct jsonObject * json_value_object(struct jsonValue * value) {
-    return &value->value.object;
-}
-
-extern struct jsonArray * json_value_array(struct jsonValue * value) {
-    return &value->value.array;
-}
-
-extern int json_value_bool(struct jsonValue * value) {
-    return value->value.boolean;
-}
-
 static size_t parse_value(const char * json, struct jsonValue * value);
 
 extern struct jsonValue * json_parse(const char * json) {
@@ -102,26 +65,6 @@ fail:
     json_free(value);
     FAIL();
     return NULL;
-}
-
-extern void json_value_free(struct jsonValue * value) {
-    if (!value) return;
-    json_value_free_internal(value);
-    json_free(value);
-}
-
-extern void json_value_free_internal(struct jsonValue * value) {
-    if (!value) return;
-    switch (value->kind) {
-    case JVK_STR:  json_string_free_internal(&value->value.string); return;
-    case JVK_NUM:  return;
-    case JVK_OBJ:  json_object_free_internal(&value->value.object); return;
-    case JVK_ARR:  json_array_free_internal(&value->value.array);   return;
-    case JVK_BOOL: return;
-    case JVK_NULL: return;
-    default: exit(1);
-    }
-    json_free(value);
 }
 
 static void append_unicode_code_point(struct jsonString * unescaped, int32_t hex) {
@@ -147,8 +90,7 @@ static size_t parse_string(const char * json, struct jsonString * string) {
     uint32_t hex;
     char buf[5];
     begin = json;
-    SKIPWS;
-    assert('"' == *json);
+    if ('"' != *json) { FAIL(); return 0; }
     ++json;
     while (1) {
         switch (*json) {
@@ -198,13 +140,14 @@ static size_t parse_object(const char * json, struct jsonObject * object) {
     struct jsonValue * value;
     size_t bytes_read;
     begin = json;
-    assert('{' == *json);
+    if ('{' != *json) goto fail;
     ++json;
     SKIPWS;
     if ('}' == *json) return json + 1 - begin;
     while (1) {
         if (!(key = json_malloc(sizeof(struct jsonString)))) goto fail;
         json_string_init(key);
+        SKIPWS;
         if (!(bytes_read = parse_string(json, key))) goto fail;
         json += bytes_read;
         SKIPWS;
@@ -234,7 +177,7 @@ static size_t parse_array(const char * json, struct jsonArray * array) {
     struct jsonValue * value;
     size_t bytes_read;
     begin = json;
-    assert('[' == *json);
+    if ('[' != *json) goto fail;
     ++json;
     SKIPWS;
     if (']' == *json) return json + 1 - begin;
@@ -257,14 +200,14 @@ fail:
 
 static size_t parse_value_object(const char * json, struct jsonValue * value) {
     value->kind = JVK_OBJ;
-    json_object_init(&value->value.object);
-    return parse_object(json, &value->value.object);
+    json_object_init(&value->v.object);
+    return parse_object(json, &value->v.object);
 }
 
 static size_t parse_value_array(const char * json, struct jsonValue * value) {
     value->kind = JVK_ARR;
-    json_array_init(&value->value.array);
-    return parse_array(json, &value->value.array);
+    json_array_init(&value->v.array);
+    return parse_array(json, &value->v.array);
 }
 
 static int is_not_prefix(const char * pref, const char * str) {
@@ -274,14 +217,14 @@ static int is_not_prefix(const char * pref, const char * str) {
 static size_t parse_value_true(const char * json, struct jsonValue * value) {
     if (is_not_prefix("true", json)) { FAIL(); return 0; }
     value->kind = JVK_BOOL;
-    value->value.boolean = 1;
+    value->v.boolean = 1;
     return 4;
 }
 
 static size_t parse_value_false(const char * json, struct jsonValue * value) {
     if (is_not_prefix("false", json)) { FAIL(); return 0; }
     value->kind = JVK_BOOL;
-    value->value.boolean = 0;
+    value->v.boolean = 0;
     return 5;
 }
 
@@ -292,15 +235,15 @@ static size_t parse_value_null(const char * json, struct jsonValue * value) {
 }
 
 static size_t parse_value_string(const char * json, struct jsonValue * value) {
-    json_string_init(&value->value.string);
+    json_string_init(&value->v.string);
     value->kind = JVK_STR;
-    return parse_string(json, &value->value.string);
+    return parse_string(json, &value->v.string);
 }
 
 static size_t parse_value_number(const char * json, struct jsonValue * value) {
     char * end;
     value->kind = JVK_NUM;
-    value->value.number = strtod(json, &end);
+    value->v.number = strtod(json, &end);
     return end - json;
 }
 

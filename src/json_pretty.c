@@ -112,7 +112,7 @@ static size_t print_json_array(char * out, size_t size, struct jsonArray * array
     }
     n += print_str(out ? out + n : NULL, size - n, "\n"); 
     n += print_indent(out ? out + n : NULL, size - n, indent);
-    n += print_str(out + n, size - n, "]");
+    n += print_str(out ? out + n : NULL, size - n, "]");
     return n;
 }
 

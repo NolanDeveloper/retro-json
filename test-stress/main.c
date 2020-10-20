@@ -171,8 +171,8 @@ int main(int argc, char * argv[]) {
         json = generate_json(JSON_SIZE);
         json_pretty_print(json_str_buffer, sizeof(json_str_buffer), json);
         json_parsed = json_parse(json_str_buffer);
-        json_pretty_print(json_str_parsed_buffer, sizeof(json_str_parsed_buffer), json_parsed);
         if (!are_equal(json, json_parsed)) {
+            json_pretty_print(json_str_parsed_buffer, sizeof(json_str_parsed_buffer), json_parsed);
             printf(RED "STRESS TEST FAILED\n" RESET);
             printf("Attempt #%d\n", i);
             printf("========================================\n");

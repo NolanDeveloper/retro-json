@@ -5,12 +5,6 @@ struct jsonString {
     unsigned hash;
 };
 
-void json_string_init(struct jsonString * string);
-void json_string_free_internal(struct jsonString * string);
-int json_string_append(struct jsonString * string, char c);
-int json_string_shrink(struct jsonString * string);
-unsigned json_string_hash(const char * str);
-
 struct jsonArrayNode {
     struct jsonArrayNode * next;
     struct jsonValue * value;
@@ -22,14 +16,6 @@ struct jsonArray {
     size_t size;
 };
 
-typedef void (*jsonArrayVisitor)(size_t index, struct jsonValue * value, void * user_data);
-
-void json_array_init(struct jsonArray * array);
-void json_array_free_internal(struct jsonArray * array);
-int json_array_add(struct jsonArray * array, struct jsonValue * value);
-size_t json_array_size(struct jsonArray * array);
-void json_array_for_each(struct jsonArray * array, jsonArrayVisitor action, void * user_data);
-
 struct jsonObjectEntry;
 struct jsonValue;
 
@@ -38,15 +24,10 @@ struct jsonObject {
     size_t capacity;
     size_t size;
     struct jsonObjectEntry * entries;
-    /*! List in which entries were added */
+    /*! List of entries in the order they were added */
     struct jsonObjectEntry * first;
     struct jsonObjectEntry * last;
 };
-
-void json_object_init(struct jsonObject * object);
-void json_object_free_internal(struct jsonObject * object);
-int json_object_add(struct jsonObject * object, struct jsonString * key, struct jsonValue * value);
-struct jsonValue * json_object_at(struct jsonObject * object, const char * key);
 
 enum jsonValueKind { JVK_STR, JVK_NUM, JVK_OBJ, JVK_ARR, JVK_BOOL, JVK_NULL };
 
@@ -68,9 +49,23 @@ struct jsonObjectEntry {
     struct jsonObjectEntry * prev;
 };
 
+struct jsonValue * json_value_create_number(double number);
+struct jsonValue * json_value_create_string(const char * string);
+struct jsonValue * json_value_create_object(void);
+struct jsonValue * json_value_create_array(void);
+struct jsonValue * json_value_create_boolean(int boolean);
+struct jsonValue * json_value_create_null(void);
+int json_value_object_add(struct jsonValue * object, const char * key, struct jsonValue * value);
+int json_value_array_add(struct jsonValue * array, struct jsonValue * value);
+/*! @todo int json_value_array_remove */
+struct jsonValue * json_value_object_lookup(struct jsonValue * object, const char * key);
+size_t json_value_array_size(struct jsonValue * array);
+struct jsonValue * json_value_array_at(struct jsonValue * array, size_t index);
 void json_value_free(struct jsonValue * value);
-void json_value_free_internal(struct jsonValue * value);
 
 struct jsonValue * json_parse(const char * json);
 
 size_t json_pretty_print(char * out, size_t size, struct jsonValue * value);
+
+
+

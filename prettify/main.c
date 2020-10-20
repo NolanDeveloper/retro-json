@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "src/json.h"
+#include "json.h"
 
 #define KB(n)   (1024 * (n))
 #define MB(n) KB(1024 * (n))
@@ -23,6 +23,7 @@
 #endif
 
 static char buffer[BUFFER_SIZE];
+static size_t would_write;
 
 int main(int argc, char ** argv) {
     int file;
@@ -34,6 +35,7 @@ int main(int argc, char ** argv) {
     memory = NULL;
     value  = NULL;
     result = EXIT_SUCCESS;
+    memset(&info, 0, sizeof(struct stat));
     if (argc != 2) {
         fprintf(stderr, "Usage: %s ./file.json\n", argv[0]);
         result = EXIT_FAILURE;
@@ -67,7 +69,10 @@ int main(int argc, char ** argv) {
         goto finish;
     }
     setvbuf(stdout, NULL, _IOFBF, 0);
+    would_write = json_pretty_print(NULL, 0, value);
+    printf("would write: %ld\n", would_write);
     json_pretty_print(buffer, sizeof(buffer) / 2, value);
+    printf("has written: %ld\n", strlen(buffer) + 1);
     puts(buffer);
     assert(strlen(buffer) <= sizeof(buffer) / 2 - 1);
 #if 0

@@ -18,6 +18,15 @@ extern void json_string_init(struct jsonString * string) {
     string->hash = FNV_OFFSET_BASIS;
 }
 
+extern int json_string_init_str(struct jsonString * string, const char * str) {
+    string->size = string->capacity = strlen(str) + 1;
+    string->data = json_malloc(string->size);
+    if (!string->data) return 0;
+    strcpy(string->data, str);
+    string->hash = json_string_hash(str);
+    return 1;
+}
+
 extern void json_string_free_internal(struct jsonString * string) {
     if (!string) return;
     json_free(string->data);

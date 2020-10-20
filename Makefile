@@ -4,9 +4,13 @@ MODE       ?= debug
 ifeq "$(MODE)" "debug"
 	CFLAGS += -g
 	CFLAGS += -O0
-else
+else ifeq "$(MODE)" "debug-fast"
+	CFLAGS += -Ofast
+else ifeq "$(MODE)" "release"
 	CFLAGS += -DNDEBUG
 	CFLAGS += -Ofast
+else 
+	$(error mode should be one of debug debug-fast release)
 endif
 
 CFLAGS     += -std=c89
@@ -16,41 +20,52 @@ CFLAGS     += -Wextra
 CFLAGS     += -pedantic
 CFLAGS     += -Werror
 
+CPPFLAGS   += -I src
+
 BUILD_DIR  := $(shell mkdir -p "build-$(MODE)" ; echo build-$(MODE) ; )
 
-PRETTIFY   := $(BUILD_DIR)/json-prettify
 LIBRARY    := $(BUILD_DIR)/libretrojson.a
-
-CFILES     := $(shell find src -name '*.c')
-ifneq "$(MODE)" "debug"
-	CFILES := $(filter-out dbg_%, $(CFILES))
-endif
-OFILES     := $(patsubst %.c, $(BUILD_DIR)/%.o, $(CFILES))
+APPS       := $(patsubst %, $(BUILD_DIR)/%/a.out, $(shell find * -name 'main.c' | sed -E 's/(.*)\/main.c/\1/g'))
+TEST_APPS  := $(filter $(BUILD_DIR)/test-%,$(APPS))
 
 .PHONY: all
-all: $(PRETTIFY) $(LIBRARY)
+all: $(LIBRARY) $(APPS)
 
-$(PRETTIFY): main.c $(LIBRARY) 
-	$(CC) $(CFLAGS) $(filter %.c %.a, $^) -o $@ 
-	$(CC) $(CFLAGS) $< -MT $@ -MM -MF $(BUILD_DIR)/main.dep
+# file compilation rule
 
-$(LIBRARY): $(OFILES)
+CFILES := $(shell find * -name '*.c')
+$(patsubst %.c, $(BUILD_DIR)/%.o, $(CFILES)): $(BUILD_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< $(CPPFLAGS) -o $@
+	@$(CC) $(CFLAGS) -c $< $(CPPFLAGS) -MT $@ -MM -MF $(BUILD_DIR)/$*.dep
+
+# application compilation rule
+# applications are all directories with main.c
+
+.SECONDEXPANSION:
+$(APPS): $(BUILD_DIR)/%/a.out: $$(shell find % -name '*.c' | sed -E 's:(.*)\.c:$(BUILD_DIR)/\1.o:g') $(LIBRARY) 
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $^ -o $@ 
+
+# libretrojson.a
+
+CFILES     := $(shell find src -name '*.c')
+ifeq "$(MODE)" "release"
+	CFILES := $(filter-out dbg_%, $(CFILES))
+endif
+$(LIBRARY): $(patsubst %.c, $(BUILD_DIR)/%.o, $(CFILES))
 	$(AR) -rcs $@ $^
 
-$(patsubst %.c, $(BUILD_DIR)/%.o, $(CFILES)): $(BUILD_DIR)/%.o: %.c
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
-	$(CC) $(CFLAGS) -c $< -MT $@ -MM -MF $(BUILD_DIR)/$*.dep
+# other targets
+
+.PHONY: check
+check: $(APPS)
+	./scripts/samples-memory-leak-check.sh
+	for i in $(TEST_APPS) ; do ./$$i ; done
+
+.PHONY: clean
+clean:
+	rm -rf build-*
 
 -include $(shell find $(BUILD_DIR) -name '*.dep')
 
-.PHONY: clean
-clean: clean-debug clean-release
-
-.PHONY: clean-debug
-clean-debug:
-	rm -rf build-debug
-
-.PHONY: clean-release
-clean-release:
-	rm -rf build-release

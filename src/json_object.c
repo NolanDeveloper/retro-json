@@ -103,3 +103,6 @@ extern int json_object_add(struct jsonObject * object, struct jsonString * key, 
     return 1;
 }
 
+extern struct jsonValue * json_value_object_lookup(struct jsonValue * object, const char * key) {
+    return json_object_at(&object->v.object, key);
+}

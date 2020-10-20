@@ -31,17 +31,31 @@ static size_t print_indent(char * out, size_t size, unsigned indent) {
 
 /* does not put null at the end */
 static size_t print_json_string(char * out, size_t size, struct jsonString * string) {
+    char buf[3];
     size_t n;
+    char * p;
     n = 0;
+    p = string->data;
     n += print_str(out ? out + n : NULL, size - n, "\"");
-    n += print_str(out ? out + n : NULL, size - n, string->data);
+    while (*p) {
+        if (*p == '\"' || *p == '\\') {
+            buf[0] = '\\';
+            buf[1] = *p;
+            buf[2] = '\0';
+        } else {
+            buf[0] = *p;
+            buf[1] = '\0';
+        }
+        n += print_str(out ? out + n : NULL, size - n, buf);
+        ++p;
+    }
     n += print_str(out ? out + n : NULL, size - n, "\"");
     return n;
 }
 
 /* does not put null at the end */
 static size_t print_json_number(char * out, size_t size, double number) {
-    static char buffer[10 * 1024];
+    char buffer[10 * 1024];
     size_t t;
     long n;
     if ((long)number == number) {

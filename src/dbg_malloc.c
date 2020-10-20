@@ -39,21 +39,6 @@ static void add_block(struct Block * block) {
     ++block_list_size;
 }
 
-void dbg_print_blocks(void) {
-    struct Block * it;
-    size_t i;
-    it = blocks_first;
-    i = 0;
-    printf("%lu blocks are not freed:\n", block_list_size);
-    while (it) {
-        printf("#%d\t%lu\t%s:%d\n", it->index, it->size, it->file, it->line);
-        it = it->next;
-        if (i++ > block_list_size) {
-            exit(-1);
-        }
-    }
-}
-
 void * dbg_malloc(size_t size, const char * file, int line) {
     void * p;
     struct Block * block;
@@ -105,3 +90,19 @@ void dbg_free(void * ptr, const char * file, int line) {
     free(ptr);
 }
 
+void dbg_print_blocks(void) {
+    struct Block * it;
+    size_t i;
+    it = blocks_first;
+    i = 0;
+    printf("%lu blocks are not freed:\n", block_list_size);
+    while (it && i < 20) {
+        printf("#%d\t%lu\t%s:%d\n", it->index, it->size, it->file, it->line);
+        it = it->next;
+        ++i;
+    }
+}
+
+int dbg_is_memory_clear(void) {
+    return !block_list_size;
+}

@@ -28,31 +28,6 @@ struct LexemeData {
     } extra;
 };
 
-/* Marker for trailing bytes */
-#define TR (-1)
-
-/* Marker for illegal bytes */
-#define IL (-2)
-
-static int utf8_bytes_left[256] = {
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-   TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR,
-   TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR,
-   TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR,
-   TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR,
-    1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-    1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-    2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-    3,  3,  3,  3,  3,  3,  3,  3,  4,  4,  4,  4,  5,  5, IL, IL,
-};
-
 static size_t parse_value(const char * json, struct jsonValue * value);
 
 extern struct jsonValue * json_parse(const char * json) {
@@ -67,7 +42,8 @@ fail:
     return NULL;
 }
 
-static void append_unicode_code_point(struct jsonString * unescaped, int32_t hex) {
+/*! Appends utf-32 char to utf-8 code unit sequence in jsonString. */
+static void append_unicode_code_point(struct jsonString * unescaped, uint32_t hex) {
     if (hex <= 0x007f) {
         json_string_append(unescaped, (char) hex);
     } else if (0x0080 <= hex && hex <= 0x07ff) {
@@ -82,13 +58,18 @@ static void append_unicode_code_point(struct jsonString * unescaped, int32_t hex
 
 #define SKIPWS while (isspace(*json)) ++json
 
+static int is_not_prefix(const char * pref, const char * str) {
+    return strncmp(pref, str, strlen(pref));
+}
+
 static size_t parse_string(const char * json, struct jsonString * string) {
     const char * begin;
     char * end;
     int i;
     int left;
-    uint32_t hex;
+    uint32_t hex, surrogate;
     char buf[5];
+    unsigned is_little_endian;
     begin = json;
     if ('"' != *json) { FAIL(); return 0; }
     ++json;
@@ -111,11 +92,29 @@ static size_t parse_string(const char * json, struct jsonString * string) {
             case 'r': json_string_append(string, '\r'); break;
             case 't': json_string_append(string, '\t'); break;
             case 'u':
-                buf[3] = buf[4] = '\0';
+                buf[4] = '\0';
                 strncpy(buf, json, 4);
-                if (!buf[3]) { FAIL(); return 0; } /* \uXXXX - not enought X */
                 hex = strtoul(buf, &end, 16);
+                if (end != &buf[4]) { FAIL(); return 0; }
                 json += 4;
+                if (hex >> 11ul == 0x1B) { /* this is utf-16 surrogate either high or low */
+                    is_little_endian = (hex >> 10ul) & 1ul;
+                    if (is_not_prefix("\\u", json)) { FAIL(); return 0; }
+                    json += 2;
+                    buf[4] = '\0';
+                    strncpy(buf, json, 4);
+                    surrogate = strtoul(buf, &end, 16);
+                    if (end != &buf[4]) { FAIL(); return 0; }
+                    if (((surrogate >> 10ul) & 1ul) == is_little_endian) { FAIL(); return 0; }
+                    hex       &= (1ul << 10ul) - 1ul;
+                    surrogate &= (1ul << 10ul) - 1ul;
+                    if (is_little_endian) {
+                        hex |= surrogate << 10ul;
+                    } else {
+                        hex = (hex << 10ul) | surrogate;
+                    }
+                    hex += 0x10000;
+                }
                 append_unicode_code_point(string, hex);
                 break;
             default: FAIL(); return 0;
@@ -140,6 +139,8 @@ static size_t parse_object(const char * json, struct jsonObject * object) {
     struct jsonValue * value;
     size_t bytes_read;
     begin = json;
+    value = NULL;
+    key = NULL;
     if ('{' != *json) goto fail;
     ++json;
     SKIPWS;
@@ -177,6 +178,7 @@ static size_t parse_array(const char * json, struct jsonArray * array) {
     struct jsonValue * value;
     size_t bytes_read;
     begin = json;
+    value = NULL;
     if ('[' != *json) goto fail;
     ++json;
     SKIPWS;
@@ -208,10 +210,6 @@ static size_t parse_value_array(const char * json, struct jsonValue * value) {
     value->kind = JVK_ARR;
     json_array_init(&value->v.array);
     return parse_array(json, &value->v.array);
-}
-
-static int is_not_prefix(const char * pref, const char * str) {
-    return strncmp(pref, str, strlen(pref));
 }
 
 static size_t parse_value_true(const char * json, struct jsonValue * value) {

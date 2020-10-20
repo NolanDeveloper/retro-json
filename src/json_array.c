@@ -9,17 +9,6 @@ extern size_t json_array_size(struct jsonArray * array) {
     return array->size;
 }
 
-extern void json_array_for_each(struct jsonArray * array, jsonArrayVisitor action, void * user_data) {
-    struct jsonArrayNode * node;
-    size_t i;
-    i = 0;
-    node = array->first;
-    while (node) {
-        action(i++, node->value, user_data);
-        node = node->next;
-    }
-}
-
 extern void json_array_init(struct jsonArray * array) {
     array->first = NULL;
     array->last = NULL;
@@ -64,4 +53,19 @@ extern int json_array_add(struct jsonArray * array, struct jsonValue * value) {
     }
     ++array->size;
     return 1;
+}
+
+size_t json_value_array_size(struct jsonValue * array) {
+    return array ? array->v.array.size : 0;
+}
+
+struct jsonValue * json_value_array_at(struct jsonValue * array, size_t index) {
+    size_t i;
+    struct jsonArrayNode * node;
+    if (!array) return NULL;
+    node = array->v.array.first;
+    for (i = 0; i < index && node; ++i) {
+        node = node->next;
+    }
+    return node->value;
 }

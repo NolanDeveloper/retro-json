@@ -10,7 +10,7 @@ else ifeq "$(MODE)" "release"
 	CFLAGS += -DNDEBUG
 	CFLAGS += -Ofast
 else 
-	$(error mode should be one of debug debug-fast release)
+	ERR := $(error $$(MODE) = $(MODE) but should be one of: debug debug-fast release)
 endif
 
 CFLAGS     += -std=c89

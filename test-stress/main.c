@@ -6,9 +6,9 @@
 #include "json_internal.h"
 
 #define REPEATS 10000
-#define JSON_SIZE 50
-#define JSON_OBJARR_KEYS 5
-#define JSON_STR_SIZE 25 /* number of unicode code points */
+#define JSON_SIZE 30
+#define JSON_OBJARR_KEYS 10
+#define JSON_STR_SIZE 20 /* number of unicode code points */
 
 /*! At most single character can take up to 12 bytes in the form of hex encoded
  * UTF-16 surrogate pairs: \uXXXX\uXXXX. We use excessive buffer size just in
@@ -20,10 +20,12 @@ static char * generate_cstr(void) {
     char c;
     char * p;
     int i;
+    const char alphabet[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     p = cstr_buffer;
     for (i = 0; i < JSON_STR_SIZE; ++i) {
-        c = rand() % (127 - 20) + 20;
-        if (c == '"' || c == '\\') *p++ = '\\';
+        /*c = rand() % (127 - 20) + 20; */
+        /*if (c == '"' || c == '\\') *p++ = '\\'; */
+        c = alphabet[rand() % (sizeof(alphabet) - 1)];
         *p++ = c; /*! @todo add unicode and escape sequences */
     }
     *p++ = '\0';
@@ -51,13 +53,13 @@ static struct jsonValue * generate_null(void) {
 static char key_buffer[sizeof(cstr_buffer) + 100];
 
 static char * generate_key(unsigned i) {
-    sprintf(key_buffer, "%d:%s", i, generate_cstr());
+    sprintf(key_buffer, "%d: %s", i, generate_cstr());
     return key_buffer;
 }
 
 static struct jsonValue * generate_json(size_t n) {
     char * key;
-    struct jsonValue * value;
+    struct jsonValue * value, * subvalue;
     size_t k, t;
     unsigned i;
     if (1 == n) {
@@ -75,9 +77,12 @@ static struct jsonValue * generate_json(size_t n) {
         for (i = 0; i < JSON_OBJARR_KEYS; ++i) {
             t = k + (i < n - k * JSON_OBJARR_KEYS ? 1 : 0);
             if (t == 0) break;
-            value = generate_json(t);
+            subvalue = generate_json(t);
             key = generate_key(i);
-            json_value_object_add(value, key, value);
+            if (!json_value_object_add(value, key, subvalue)) {
+                printf("json_value_object_add failed\n");
+                exit(EXIT_FAILURE);
+            }
         }
     } else {
         value = json_value_create_array();
@@ -85,7 +90,10 @@ static struct jsonValue * generate_json(size_t n) {
         for (i = 0; i < JSON_OBJARR_KEYS; ++i) {
             t = k + (i < n - k * JSON_OBJARR_KEYS ? 1 : 0);
             if (t == 0) break;
-            json_value_array_add(value, generate_json(t));
+            if (!json_value_array_add(value, generate_json(t))) {
+                printf("json_value_array_add failed\n");
+                exit(EXIT_FAILURE);
+            }
         }
     }
     return value;
@@ -184,12 +192,16 @@ int main(int argc, char * argv[]) {
         }
         json_value_free(json_parsed);
         json_value_free(json);
-    }
-    if (!dbg_is_memory_clear()) {
-        printf(RED "STRESS TEST FAILED\n" RESET);
-        printf("There was a memory leak.\n");
-        dbg_print_blocks();
-        return EXIT_FAILURE;
+        if (!dbg_is_memory_clear()) {
+            printf(RED "STRESS TEST FAILED\n" RESET);
+            printf("Attempt #%d\n", i);
+            printf("========================================\n");
+            printf("%s\n", json_str_buffer);
+            printf("========================================\n");
+            printf("There was a memory leak.\n");
+            dbg_print_blocks();
+            return EXIT_FAILURE;
+        }
     }
     printf(GREEN "STRESS TEST PASSED\n" RESET);
     return EXIT_SUCCESS;

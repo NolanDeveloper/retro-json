@@ -19,6 +19,7 @@ extern void json_string_init(struct jsonString * string) {
 }
 
 extern int json_string_init_str(struct jsonString * string, const char * str) {
+    if (!str) return 0;
     string->size = string->capacity = strlen(str) + 1;
     string->data = json_malloc(string->size);
     if (!string->data) return 0;
@@ -49,8 +50,10 @@ static int json_string_ensure_has_free_space(struct jsonString * string) {
 extern int json_string_append(struct jsonString * string, char c) {
     if (!json_string_ensure_has_free_space(string)) return 0;
     string->data[string->size++] = c;
-    string->hash ^= c;
-    string->hash *= FNV_PRIME;
+    if (c != 0) {
+        string->hash ^= c;
+        string->hash *= FNV_PRIME;
+    }
     return 1;
 }
 

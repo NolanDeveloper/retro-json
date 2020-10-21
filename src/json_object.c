@@ -14,14 +14,16 @@ extern struct jsonValue * json_object_at(struct jsonObject * object, const char 
     if (!object->capacity || !object->size) return NULL;
     hash = json_string_hash(key);
     fence = &object->entries[object->capacity];
-    for (entry = &object->entries[hash % object->capacity]; entry->key; ++entry) {
-        if (entry == fence) {
-            entry = object->entries;
-        }
+    entry = &object->entries[hash % object->capacity];
+    while (entry->key) {
         if (entry->key->hash == hash && !strcmp(entry->key->data, key)) {
             break;
         }
+        if (++entry == fence) {
+            entry = object->entries;
+        }
     }
+    if (!entry->key) return NULL;
     return entry->value;
 }
 
@@ -101,6 +103,15 @@ extern int json_object_add(struct jsonObject * object, struct jsonString * key, 
     entry->next = NULL;
     ++object->size;
     return 1;
+}
+
+int json_value_object_add(struct jsonValue * object, const char * key, struct jsonValue * value) {
+    struct jsonString * string;
+    if (object->kind != JVK_OBJ) return 0;
+    string = json_malloc(sizeof(struct jsonString));
+    if (!string) return 0;
+    if (!json_string_init_str(string, key)) return 0;
+    return json_object_add(&object->v.object, string, value);
 }
 
 extern struct jsonValue * json_value_object_lookup(struct jsonValue * object, const char * key) {

@@ -16,14 +16,9 @@
 
 #define TAB_SIZE 4
 
-#ifndef NDEBUG
-#define BUFFER_SIZE 100
-#else
 #define BUFFER_SIZE KB(20)
-#endif
 
 static char buffer[BUFFER_SIZE];
-static size_t would_write;
 
 int main(int argc, char ** argv) {
     int file;
@@ -69,16 +64,8 @@ int main(int argc, char ** argv) {
         goto finish;
     }
     setvbuf(stdout, NULL, _IOFBF, 0);
-    would_write = json_pretty_print(NULL, 0, value);
-    printf("would write: %ld\n", would_write);
-    json_pretty_print(buffer, sizeof(buffer) / 2, value);
-    printf("has written: %ld\n", strlen(buffer) + 1);
+    json_pretty_print(buffer, sizeof(buffer), value);
     puts(buffer);
-    assert(strlen(buffer) <= sizeof(buffer) / 2 - 1);
-#if 0
-    puts("second half:"); /*!< @todo check second half is empty */
-    puts(buffer + sizeof(buffer) / 2);
-#endif 
 finish:
     fflush(stdout);
     json_value_free(value);

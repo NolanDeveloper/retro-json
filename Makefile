@@ -14,11 +14,11 @@ else
 endif
 
 CFLAGS     += -std=c89
-CFLAGS     += -Wstrict-prototypes
+CFLAGS     += -pedantic
 CFLAGS     += -Wall
 CFLAGS     += -Wextra
-CFLAGS     += -pedantic
 CFLAGS     += -Werror
+CFLAGS     += -Wstrict-prototypes
 
 CPPFLAGS   += -I src
 

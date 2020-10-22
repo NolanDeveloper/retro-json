@@ -104,25 +104,17 @@ static size_t print_json_object(char * out, size_t size, struct jsonObject * obj
 
 /* does not put null at the end */
 static size_t print_json_array(char * out, size_t size, struct jsonArray * array, unsigned indent) {
-    struct jsonArrayNode * node;
-    size_t n;
+    size_t n, i;
     n = 0;
     if (!array->size) {
         n += print_str(out ? out + n : NULL, size - n, "[ ]"); 
         return n;
     }
     n += print_str(out ? out + n : NULL, size - n, "[\n");
-    node = array->first;
-    if (node) {
+    for (i = 0; i < array->size; ++i) {
+        if (i) n += print_str(out ? out + n : NULL, size - n, ",\n");
         n += print_indent(out ? out + n : NULL, size - n, indent + TAB_SIZE);
-        n += print_json_value(out ? out + n : NULL, size - n, node->value, indent + TAB_SIZE);
-        node = node->next;
-    }
-    while (node) {
-        n += print_str(out ? out + n : NULL, size - n, ",\n");
-        n += print_indent(out ? out + n : NULL, size - n, indent + TAB_SIZE);
-        n += print_json_value(out ? out + n : NULL, size - n, node->value, indent + TAB_SIZE);
-        node = node->next;
+        n += print_json_value(out ? out + n : NULL, size - n, array->values[i], indent + TAB_SIZE);
     }
     n += print_str(out ? out + n : NULL, size - n, "\n"); 
     n += print_indent(out ? out + n : NULL, size - n, indent);

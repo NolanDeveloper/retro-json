@@ -30,7 +30,7 @@ unsigned json_string_hash(const char * str);
 
 void json_array_init(struct jsonArray * array);
 void json_array_free_internal(struct jsonArray * array);
-int json_array_add(struct jsonArray * array, struct jsonValue * value);
+int json_array_append(struct jsonArray * array, struct jsonValue * value);
 size_t json_array_size(struct jsonArray * array);
 
 void json_object_init(struct jsonObject * object);

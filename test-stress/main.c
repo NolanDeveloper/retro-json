@@ -90,7 +90,7 @@ static struct jsonValue * generate_json(size_t n) {
         for (i = 0; i < JSON_OBJARR_KEYS; ++i) {
             t = k + (i < n - k * JSON_OBJARR_KEYS ? 1 : 0);
             if (t == 0) break;
-            if (!json_value_array_add(value, generate_json(t))) {
+            if (!json_value_array_append(value, generate_json(t))) {
                 printf("json_value_array_add failed\n");
                 exit(EXIT_FAILURE);
             }
@@ -119,20 +119,18 @@ static int are_equal_objects(struct jsonValue * left, struct jsonValue * right) 
 }
 
 static int are_equal_arrays(struct jsonValue * left, struct jsonValue * right) {
-    struct jsonArrayNode * left_node, * right_node;
-    size_t i;
-    i = 0;
-    left_node = left->v.array.first;
-    right_node = right->v.array.first;
-    while (left_node && right_node) {
-        if (!are_equal(left_node->value, right_node->value)) {
+    struct jsonValue * left_element, * right_element;
+    size_t i, n;
+    n = json_value_array_size(left);
+    if (n != json_value_array_size(right)) return 0;
+    for (i = 0; i < n; ++i) {
+        left_element = json_value_array_at(left, i);
+        right_element = json_value_array_at(right, i);
+        if (!are_equal(left_element, right_element)) {
             return 0;
         }
-        left_node = left_node->next;
-        right_node = right_node->next;
-        ++i;
     }
-    return !left_node && !right_node;
+    return 1;
 }
 
 static int are_equal(struct jsonValue * left, struct jsonValue * right) {

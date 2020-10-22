@@ -187,7 +187,7 @@ static size_t parse_array(const char * json, struct jsonArray * array) {
         if (!(value = json_malloc(sizeof(struct jsonValue)))) goto fail;
         if (!(bytes_read = parse_value(json, value))) goto fail;
         json += bytes_read;
-        if (!json_array_add(array, value)) goto fail;
+        if (!json_array_append(array, value)) goto fail;
         value = NULL;
         SKIPWS;
         if (']' == *json) { ++json; break; };

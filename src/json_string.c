@@ -8,8 +8,8 @@
 
 #define INITIAL_CAPACITY    16
 
-#define FNV_OFFSET_BASIS    2166136261
-#define FNV_PRIME           16777619
+#define FNV_OFFSET_BASIS    2166136261u
+#define FNV_PRIME           16777619u
 
 extern void json_string_init(struct jsonString * string) {
     string->capacity = 0;
@@ -37,10 +37,13 @@ extern void json_string_free_internal(struct jsonString * string) {
     string->hash = FNV_OFFSET_BASIS;
 }
 
-static int json_string_ensure_has_free_space(struct jsonString * string) {
+static int json_string_ensure_has_free_space(struct jsonString * string, size_t n) {
     size_t new_capacity;
-    if (string->size < string->capacity) return 1;
-    new_capacity = string->capacity ? 2 * string->capacity : INITIAL_CAPACITY;
+    new_capacity = string->capacity;
+    if (string->size + n <= string->capacity) return 1;
+    do {
+        new_capacity = new_capacity ? 2 * new_capacity : INITIAL_CAPACITY;
+    } while (string->size + n > new_capacity);
     string->data = json_realloc(string->data, new_capacity);
     if (!string->data) return 0;
     string->capacity = new_capacity;
@@ -48,7 +51,7 @@ static int json_string_ensure_has_free_space(struct jsonString * string) {
 }
 
 extern int json_string_append(struct jsonString * string, char c) {
-    if (!json_string_ensure_has_free_space(string)) return 0;
+    if (!json_string_ensure_has_free_space(string, 1)) return 0;
     string->data[string->size++] = c;
     if (c != 0) {
         string->hash ^= c;

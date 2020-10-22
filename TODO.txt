@@ -1,8 +1,9 @@
 * Add parsing error message(line, offset). This should be optional as often
   error message is not required.
 * In parser and in all procedures working with Objects recurstion depth must be limited.
-* Implement arrays on actual arrays.
 * Implement json object as hashmap with linear probing.
     * Implement removing elements
+* Add as much documentation as possible
+* Add cool readme
 * Parser should be more inclusive. e.g. parse trailing comma
 * Add proper error handling with to pretty printer

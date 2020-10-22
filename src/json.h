@@ -5,15 +5,10 @@ struct jsonString {
     unsigned hash;
 };
 
-struct jsonArrayNode {
-    struct jsonArrayNode * next;
-    struct jsonValue * value;
-};
-
 struct jsonArray {
-    struct jsonArrayNode * first;
-    struct jsonArrayNode * last;
+    size_t capacity;
     size_t size;
+    struct jsonValue * * values;
 };
 
 struct jsonObjectEntry;
@@ -56,7 +51,7 @@ struct jsonValue * json_value_create_array(void);
 struct jsonValue * json_value_create_boolean(int boolean);
 struct jsonValue * json_value_create_null(void);
 int json_value_object_add(struct jsonValue * object, const char * key, struct jsonValue * value);
-int json_value_array_add(struct jsonValue * array, struct jsonValue * value);
+int json_value_array_append(struct jsonValue * array, struct jsonValue * value);
 /*! @todo int json_value_array_remove */
 struct jsonValue * json_value_object_lookup(struct jsonValue * object, const char * key);
 size_t json_value_array_size(struct jsonValue * array);

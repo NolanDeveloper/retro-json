@@ -56,9 +56,9 @@ struct jsonValue * json_value_create_null(void) {
     return json;
 }
 
-int json_value_array_add(struct jsonValue * array, struct jsonValue * value) {
+int json_value_array_append(struct jsonValue * array, struct jsonValue * value) {
     if (array->kind != JVK_ARR) return 0;
-    if (!json_array_add(&array->v.array, value)) return 0;
+    if (!json_array_append(&array->v.array, value)) return 0;
     return 1;
 }
 

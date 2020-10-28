@@ -13,7 +13,7 @@
 #define FNV_OFFSET_BASIS    2166136261u
 #define FNV_PRIME           16777619u
 
-extern void json_string_init(struct jsonString * string) {
+extern void json_string_init(struct jsonString *string) {
     assert(string);
     string->capacity = 0;
     string->size = 0;
@@ -21,7 +21,7 @@ extern void json_string_init(struct jsonString * string) {
     string->hash = FNV_OFFSET_BASIS;
 }
 
-extern bool json_string_init_str(struct jsonString * string, const char * str) {
+extern bool json_string_init_str(struct jsonString *string, const char *str) {
     assert(string);
     if (!str) {
         return false;
@@ -36,7 +36,7 @@ extern bool json_string_init_str(struct jsonString * string, const char * str) {
     return 1;
 }
 
-extern void json_string_free_internal(struct jsonString * string) {
+extern void json_string_free_internal(struct jsonString *string) {
     if (!string) {
         return;
     }
@@ -47,13 +47,13 @@ extern void json_string_free_internal(struct jsonString * string) {
     string->hash = FNV_OFFSET_BASIS;
 }
 
-static bool json_string_ensure_has_free_space(struct jsonString * string, size_t n) {
+static bool json_string_ensure_has_free_space(struct jsonString *string, size_t n) {
     size_t new_capacity = string->capacity;
     if (string->size + n <= string->capacity) {
         return true;
     }
     do {
-        new_capacity = new_capacity ? 2 * new_capacity : INITIAL_CAPACITY;
+        new_capacity = new_capacity ? 2 *new_capacity : INITIAL_CAPACITY;
     } while (string->size + n > new_capacity);
     string->data = json_realloc(string->data, new_capacity);
     if (!string->data) {
@@ -63,7 +63,7 @@ static bool json_string_ensure_has_free_space(struct jsonString * string, size_t
     return true;
 }
 
-extern bool json_string_append(struct jsonString * string, char c) {
+extern bool json_string_append(struct jsonString *string, char c) {
     if (!json_string_ensure_has_free_space(string, 1)) {
         return false;
     }
@@ -75,17 +75,17 @@ extern bool json_string_append(struct jsonString * string, char c) {
     return true;
 }
 
-extern bool json_string_shrink(struct jsonString * string) {
+extern bool json_string_shrink(struct jsonString *string) {
     if (!string->capacity) return true;
     assert(string->size);
-    void * new_data = json_realloc(string->data, string->size);
+    void *new_data = json_realloc(string->data, string->size);
     if (new_data) {
         string->data = new_data;
     }
     return new_data;
 }
 
-extern unsigned json_string_hash(const char * str) {
+extern unsigned json_string_hash(const char *str) {
     unsigned n;
     n = FNV_OFFSET_BASIS;
     if (!str) return n;

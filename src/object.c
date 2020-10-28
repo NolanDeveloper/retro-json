@@ -10,8 +10,8 @@
 
 #define INITIAL_CAPACITY 16
 
-extern struct jsonValue * json_object_at(struct jsonObject * object, const char * key) {
-    struct jsonObjectEntry * entry, * fence;
+extern struct jsonValue *json_object_at(struct jsonObject *object, const char *key) {
+    struct jsonObjectEntry *entry, *fence;
     unsigned hash;
     if (!object->capacity || !object->size) return NULL;
     hash = json_string_hash(key);
@@ -29,7 +29,7 @@ extern struct jsonValue * json_object_at(struct jsonObject * object, const char 
     return entry->value;
 }
 
-extern void json_object_init(struct jsonObject * object) {
+extern void json_object_init(struct jsonObject *object) {
     object->capacity = 0;
     object->size     = 0;
     object->entries  = NULL;
@@ -37,8 +37,8 @@ extern void json_object_init(struct jsonObject * object) {
     object->last     = NULL;
 }
 
-extern void json_object_free_internal(struct jsonObject * object) {
-    struct jsonObjectEntry * entry;
+extern void json_object_free_internal(struct jsonObject *object) {
+    struct jsonObjectEntry *entry;
     if (!object) return;
     entry = object->first;
     while (entry) {
@@ -51,26 +51,26 @@ extern void json_object_free_internal(struct jsonObject * object) {
     json_object_init(object);
 }
 
-static bool json_object_ensure_has_free_space(struct jsonObject * object) {
+static bool json_object_ensure_has_free_space(struct jsonObject *object) {
     assert(object);
     if (!object->entries) {
-        object->entries = json_calloc(INITIAL_CAPACITY * sizeof(struct jsonObjectEntry));
+        object->entries = json_calloc(INITIAL_CAPACITY *sizeof(struct jsonObjectEntry));
         if (!object->entries) {
             return false;
         }
         object->capacity = INITIAL_CAPACITY;
         return true;
     }
-    if ((object->size + 1) * 3 / 2 < object->capacity) {
+    if ((object->size + 1) *3 / 2 < object->capacity) {
         return true;
     }
     object->capacity *= 2;
-    struct jsonObjectEntry * old_entries = object->entries;
-    object->entries = json_calloc(object->capacity * sizeof(struct jsonObjectEntry));
+    struct jsonObjectEntry *old_entries = object->entries;
+    object->entries = json_calloc(object->capacity *sizeof(struct jsonObjectEntry));
     if (!object->entries) {
         return false;
     }
-    struct jsonObjectEntry * first = object->first;
+    struct jsonObjectEntry *first = object->first;
     object->first = object->last = NULL;
     object->size = 0;
     while (first) {
@@ -81,15 +81,15 @@ static bool json_object_ensure_has_free_space(struct jsonObject * object) {
     return true;
 }
 
-extern bool json_object_add(struct jsonObject * object, struct jsonString * key, struct jsonValue * value) {
+extern bool json_object_add(struct jsonObject *object, struct jsonString *key, struct jsonValue *value) {
     assert(object);
     assert(key);
     assert(value);
     if (!json_object_ensure_has_free_space(object)) {
         return false;
     }
-    struct jsonObjectEntry * fence = &object->entries[object->capacity];
-    struct jsonObjectEntry * entry = &object->entries[key->hash % object->capacity]; 
+    struct jsonObjectEntry *fence = &object->entries[object->capacity];
+    struct jsonObjectEntry *entry = &object->entries[key->hash % object->capacity]; 
     while (entry->key) {
         if (entry->key->hash == key->hash && !strcmp(entry->key->data, key->data)) {
             return 0;
@@ -113,7 +113,7 @@ extern bool json_object_add(struct jsonObject * object, struct jsonString * key,
     return true;
 }
 
-bool json_value_object_add(struct jsonValue * object, const char * key, struct jsonValue * value) {
+bool json_value_object_add(struct jsonValue *object, const char *key, struct jsonValue *value) {
     if (!object) { 
         errorf("object == NULL");
         return false;
@@ -130,7 +130,7 @@ bool json_value_object_add(struct jsonValue * object, const char * key, struct j
         errorf("object->kind != JVK_OBJ");
         return false;
     }
-    struct jsonString * string = json_malloc(sizeof(struct jsonString));
+    struct jsonString *string = json_malloc(sizeof(struct jsonString));
     if (!string) {
         return false;
     }
@@ -141,6 +141,6 @@ bool json_value_object_add(struct jsonValue * object, const char * key, struct j
     return json_object_add(&object->v.object, string, value);
 }
 
-extern struct jsonValue * json_value_object_lookup(struct jsonValue * object, const char * key) {
+extern struct jsonValue *json_value_object_lookup(struct jsonValue *object, const char *key) {
     return json_object_at(&object->v.object, key);
 }

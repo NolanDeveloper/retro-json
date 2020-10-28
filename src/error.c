@@ -6,10 +6,11 @@
 #include "json.h"
 #include "json_internal.h"
 
-const char * error_out_of_memory = "out of memory";
-__thread const char * error;
+const char *error_out_of_memory = "out of memory";
 
-void set_error(const char * e) {
+thread_local const char *error;
+
+void set_error(const char *e) {
     if (error && error != error_out_of_memory) {
         json_free((char *) error);
     }

@@ -9,17 +9,17 @@
 
 #define INITIAL_CAPACITY 6
 
-extern size_t json_array_size(struct jsonArray * array) {
+extern size_t json_array_size(struct jsonArray *array) {
     return array->size;
 }
 
-extern void json_array_init(struct jsonArray * array) {
+extern void json_array_init(struct jsonArray *array) {
     array->capacity = 0;
     array->size = 0;
     array->values = NULL;
 }
 
-extern void json_array_free_internal(struct jsonArray * array) {
+extern void json_array_free_internal(struct jsonArray *array) {
     if (!array) {
         return;
     }
@@ -32,15 +32,15 @@ extern void json_array_free_internal(struct jsonArray * array) {
     array->values = NULL;
 }
 
-static bool json_array_ensure_has_free_space(struct jsonArray * array, size_t n) {
+static bool json_array_ensure_has_free_space(struct jsonArray *array, size_t n) {
     if (array->size + n <= array->capacity) {
         return true;
     }
     size_t new_capacity = array->capacity;
     do {
-        new_capacity = new_capacity ? 2 * new_capacity : INITIAL_CAPACITY;
+        new_capacity = new_capacity ? 2 *new_capacity : INITIAL_CAPACITY;
     } while (array->size + n > new_capacity);
-    struct jsonValue ** new_values = json_realloc(array->values, new_capacity * sizeof(struct jsonValue *));
+    struct jsonValue **new_values = json_realloc(array->values, new_capacity *sizeof(struct jsonValue *));
     if (!new_values) {
         return false;
     }
@@ -49,7 +49,7 @@ static bool json_array_ensure_has_free_space(struct jsonArray * array, size_t n)
     return true;
 }
 
-extern bool json_array_append(struct jsonArray * array, struct jsonValue * value) {
+extern bool json_array_append(struct jsonArray *array, struct jsonValue *value) {
     if (!json_array_ensure_has_free_space(array, 1)) {
         return false;
     }
@@ -57,10 +57,10 @@ extern bool json_array_append(struct jsonArray * array, struct jsonValue * value
     return true;
 }
 
-size_t json_value_array_size(struct jsonValue * array) {
+size_t json_value_array_size(struct jsonValue *array) {
     return array ? array->v.array.size : 0;
 }
 
-struct jsonValue * json_value_array_at(struct jsonValue * array, size_t index) {
+struct jsonValue *json_value_array_at(struct jsonValue *array, size_t index) {
     return (array && index < array->v.array.size) ? array->v.array.values[index] : NULL;
 }

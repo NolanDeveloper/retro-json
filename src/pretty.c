@@ -10,9 +10,9 @@
 
 #define TAB_SIZE 4
 
-static size_t print_json_value(char * out, size_t size, struct jsonValue * value, unsigned indent);
+static size_t print_json_value(char *out, size_t size, struct jsonValue *value, unsigned indent);
 
-static size_t print_str(char * out, size_t size, const char * string) {
+static size_t print_str(char *out, size_t size, const char *string) {
     size_t len;
     len = strlen(string);
     if (!out) return len;
@@ -21,7 +21,7 @@ static size_t print_str(char * out, size_t size, const char * string) {
     return len;
 }
 
-static size_t print_indent(char * out, size_t size, unsigned indent) {
+static size_t print_indent(char *out, size_t size, unsigned indent) {
     unsigned t;
     if (!out) return indent;
     if (size < indent) indent = size;
@@ -33,11 +33,10 @@ static size_t print_indent(char * out, size_t size, unsigned indent) {
     return indent;
 }
 
-/* does not put null at the end */
-static size_t print_json_string(char * out, size_t size, struct jsonString * string) {
+static size_t print_json_string(char *out, size_t size, struct jsonString *string) {
     char buf[3];
     size_t n;
-    char * p;
+    char *p;
     n = 0;
     p = string->data;
     n += print_str(out ? out + n : NULL, size - n, "\"");
@@ -57,8 +56,7 @@ static size_t print_json_string(char * out, size_t size, struct jsonString * str
     return n;
 }
 
-/* does not put null at the end */
-static size_t print_json_number(char * out, size_t size, double number) {
+static size_t print_json_number(char *out, size_t size, double number) {
     size_t t;
     long n;
     if (isnan(number)) {
@@ -80,9 +78,8 @@ static size_t print_json_number(char * out, size_t size, double number) {
     return t;
 }
 
-/* does not put null at the end */
-static size_t print_json_object(char * out, size_t size, struct jsonObject * object, unsigned indent) {
-    struct jsonObjectEntry * entry;
+static size_t print_json_object(char *out, size_t size, struct jsonObject *object, unsigned indent) {
+    struct jsonObjectEntry *entry;
     size_t n;
     n = 0;
     if (!object->size) {
@@ -112,8 +109,7 @@ static size_t print_json_object(char * out, size_t size, struct jsonObject * obj
     return n;
 }
 
-/* does not put null at the end */
-static size_t print_json_array(char * out, size_t size, struct jsonArray * array, unsigned indent) {
+static size_t print_json_array(char *out, size_t size, struct jsonArray *array, unsigned indent) {
     size_t n, i;
     n = 0;
     if (!array->size) {
@@ -132,8 +128,7 @@ static size_t print_json_array(char * out, size_t size, struct jsonArray * array
     return n;
 }
 
-/* does not put null at the end */
-static size_t print_json_value(char * out, size_t size, struct jsonValue * value, unsigned indent) {
+static size_t print_json_value(char *out, size_t size, struct jsonValue *value, unsigned indent) {
     switch (value->kind) {
     case JVK_STR:  return print_json_string(out, size, &value->v.string);
     case JVK_NUM:  return print_json_number(out, size, value->v.number);
@@ -147,7 +142,7 @@ static size_t print_json_value(char * out, size_t size, struct jsonValue * value
 
 /* puts null at the end */
 /* returns number of bytes writen or that would have been written if out is NULL */
-extern size_t json_pretty_print(char * out, size_t size, struct jsonValue * value) {
+extern size_t json_pretty_print(char *out, size_t size, struct jsonValue *value) {
     size_t n;
     if (!value) {
         if (out && size) *out = '\0';

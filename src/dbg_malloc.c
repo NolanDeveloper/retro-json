@@ -5,27 +5,30 @@
 #include <stdlib.h>
 
 struct Block {
-    struct Block * next;
-    struct Block * prev;
-    const char *   file;
-    int            line;
-    int            index;
-    size_t         size;
-    char           memory[1];
+    struct Block *next;
+    struct Block *prev;
+    const char *file;
+    int line;
+    int index;
+    size_t size;
+    char memory[];
 };
 
-struct Block * blocks_first;
+struct Block *blocks_first;
 size_t block_list_size;
 size_t block_index;
 
-static void remove_block(struct Block * block) {
+static void remove_block(struct Block *block) {
     if (block == blocks_first) {
         blocks_first = blocks_first->next;
     }
-    if (block->prev) block->prev->next = block->next;
-    if (block->next) block->next->prev = block->prev;
-    block->next = NULL;
-    block->prev = NULL;
+    if (block->prev) {
+        block->prev->next = block->next;
+    }
+    if (block->next) {
+        block->next->prev = block->prev;
+    }
+    block->next = block->prev = NULL;
     --block_list_size;
 }
 
@@ -43,7 +46,7 @@ static void add_block(struct Block * block) {
 void * dbg_malloc(size_t size, const char * file, int line) {
     void * p;
     struct Block * block;
-    p = malloc(sizeof(struct Block) + size - 1);
+    p = malloc(sizeof(struct Block) + size);
     if (!p) return NULL;
     block = p;
     block->file = file;
@@ -57,7 +60,7 @@ void * dbg_malloc(size_t size, const char * file, int line) {
 void * dbg_calloc(size_t size, const char * file, int line) {
     void * p;
     struct Block * block;
-    p = calloc(sizeof(struct Block) + size - 1, 1);
+    p = calloc(sizeof(struct Block) + size, 1);
     if (!p) return NULL;
     block = p;
     block->file = file;
@@ -73,7 +76,7 @@ void * dbg_realloc(void * ptr, size_t size, const char * file, int line) {
     if (!ptr) return dbg_malloc(size, file, line);
     block = ptr = (char *)ptr - offsetof(struct Block, memory);
     remove_block(block);
-    block = realloc(block, sizeof(struct Block) + size - 1);
+    block = realloc(block, sizeof(struct Block) + size);
     block->file = file;
     block->line = line;
     block->index = block_index++;

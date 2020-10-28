@@ -5,8 +5,8 @@
 #include "json.h"
 #include "json_internal.h"
 
-struct jsonValue * json_value_create_number(double number) {
-    struct jsonValue * json = json_malloc(sizeof(struct jsonValue));
+struct jsonValue *json_value_create_number(double number) {
+    struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
@@ -15,8 +15,8 @@ struct jsonValue * json_value_create_number(double number) {
     return json;
 }
 
-struct jsonValue * json_value_create_string(const char * string) {
-    struct jsonValue * json = json_malloc(sizeof(struct jsonValue));
+struct jsonValue *json_value_create_string(const char *string) {
+    struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
@@ -28,8 +28,8 @@ struct jsonValue * json_value_create_string(const char * string) {
     return json;
 }
 
-struct jsonValue * json_value_create_object(void) {
-    struct jsonValue * json = json_malloc(sizeof(struct jsonValue));
+struct jsonValue *json_value_create_object(void) {
+    struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
@@ -38,8 +38,8 @@ struct jsonValue * json_value_create_object(void) {
     return json;
 }
 
-struct jsonValue * json_value_create_array(void) {
-    struct jsonValue * json = json_malloc(sizeof(struct jsonValue));
+struct jsonValue *json_value_create_array(void) {
+    struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
@@ -48,8 +48,8 @@ struct jsonValue * json_value_create_array(void) {
     return json;
 }
 
-struct jsonValue * json_value_create_boolean(int boolean) {
-    struct jsonValue * json = json_malloc(sizeof(struct jsonValue));
+struct jsonValue *json_value_create_boolean(int boolean) {
+    struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
@@ -58,8 +58,8 @@ struct jsonValue * json_value_create_boolean(int boolean) {
     return json;
 }
 
-struct jsonValue * json_value_create_null(void) {
-    struct jsonValue * json = json_malloc(sizeof(struct jsonValue));
+struct jsonValue *json_value_create_null(void) {
+    struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
@@ -67,7 +67,7 @@ struct jsonValue * json_value_create_null(void) {
     return json;
 }
 
-bool json_value_array_append(struct jsonValue * array, struct jsonValue * value) {
+bool json_value_array_append(struct jsonValue *array, struct jsonValue *value) {
     if (!array) {
         errorf("array == NULL");
         return false;

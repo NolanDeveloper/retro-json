@@ -32,7 +32,7 @@ static void remove_block(struct Block *block) {
     --block_list_size;
 }
 
-static void add_block(struct Block * block) {
+static void add_block(struct Block *block) {
     block->next = blocks_first;
     block->prev = NULL;
     if (blocks_first) {
@@ -43,11 +43,13 @@ static void add_block(struct Block * block) {
     ++block_list_size;
 }
 
-extern void * dbg_malloc(size_t size, const char * file, int line) {
-    void * p;
-    struct Block * block;
+extern void *dbg_malloc(size_t size, const char *file, int line) {
+    void *p;
+    struct Block *block;
     p = malloc(sizeof(struct Block) + size);
-    if (!p) return NULL;
+    if (!p) {
+        return NULL;
+    }
     block = p;
     block->file = file;
     block->line = line;
@@ -57,11 +59,13 @@ extern void * dbg_malloc(size_t size, const char * file, int line) {
     return block->memory;
 }
 
-extern void * dbg_calloc(size_t size, const char * file, int line) {
-    void * p;
-    struct Block * block;
+extern void *dbg_calloc(size_t size, const char *file, int line) {
+    void *p;
+    struct Block *block;
     p = calloc(sizeof(struct Block) + size, 1);
-    if (!p) return NULL;
+    if (!p) {
+        return NULL;
+    }
     block = p;
     block->file = file;
     block->line = line;
@@ -71,10 +75,12 @@ extern void * dbg_calloc(size_t size, const char * file, int line) {
     return block->memory;
 }
 
-extern void * dbg_realloc(void * ptr, size_t size, const char * file, int line) {
-    struct Block * block;
-    if (!ptr) return dbg_malloc(size, file, line);
-    block = ptr = (char *)ptr - offsetof(struct Block, memory);
+extern void *dbg_realloc(void *ptr, size_t size, const char *file, int line) {
+    struct Block *block;
+    if (!ptr) {
+        return dbg_malloc(size, file, line);
+    }
+    block = ptr = (char *) ptr - offsetof(struct Block, memory);
     remove_block(block);
     block = realloc(block, sizeof(struct Block) + size);
     block->file = file;
@@ -85,20 +91,20 @@ extern void * dbg_realloc(void * ptr, size_t size, const char * file, int line) 
     return block->memory;
 }
 
-extern void dbg_free(void * ptr, const char * file, int line) {
-    if (!ptr) return;
+extern void dbg_free(void *ptr, const char *file, int line) {
+    if (!ptr) {
+        return;
+    }
     (void) file;
     (void) line;
-    ptr = (char *)ptr - offsetof(struct Block, memory);
+    ptr = (char *) ptr - offsetof(struct Block, memory);
     remove_block(ptr);
     free(ptr);
 }
 
 extern void dbg_print_blocks(void) {
-    struct Block * it;
-    size_t i;
-    it = blocks_first;
-    i = 0;
+    struct Block *it = blocks_first;
+    size_t i = 0;
     printf("%lu blocks are not freed:\n", block_list_size);
     while (it && i < 20) {
         printf("#%d\t%lu\t%s:%d\n", it->index, it->size, it->file, it->line);

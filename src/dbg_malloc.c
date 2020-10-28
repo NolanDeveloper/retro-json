@@ -43,7 +43,7 @@ static void add_block(struct Block * block) {
     ++block_list_size;
 }
 
-void * dbg_malloc(size_t size, const char * file, int line) {
+extern void * dbg_malloc(size_t size, const char * file, int line) {
     void * p;
     struct Block * block;
     p = malloc(sizeof(struct Block) + size);
@@ -57,7 +57,7 @@ void * dbg_malloc(size_t size, const char * file, int line) {
     return block->memory;
 }
 
-void * dbg_calloc(size_t size, const char * file, int line) {
+extern void * dbg_calloc(size_t size, const char * file, int line) {
     void * p;
     struct Block * block;
     p = calloc(sizeof(struct Block) + size, 1);
@@ -71,7 +71,7 @@ void * dbg_calloc(size_t size, const char * file, int line) {
     return block->memory;
 }
 
-void * dbg_realloc(void * ptr, size_t size, const char * file, int line) {
+extern void * dbg_realloc(void * ptr, size_t size, const char * file, int line) {
     struct Block * block;
     if (!ptr) return dbg_malloc(size, file, line);
     block = ptr = (char *)ptr - offsetof(struct Block, memory);
@@ -85,7 +85,7 @@ void * dbg_realloc(void * ptr, size_t size, const char * file, int line) {
     return block->memory;
 }
 
-void dbg_free(void * ptr, const char * file, int line) {
+extern void dbg_free(void * ptr, const char * file, int line) {
     if (!ptr) return;
     (void) file;
     (void) line;
@@ -94,7 +94,7 @@ void dbg_free(void * ptr, const char * file, int line) {
     free(ptr);
 }
 
-void dbg_print_blocks(void) {
+extern void dbg_print_blocks(void) {
     struct Block * it;
     size_t i;
     it = blocks_first;
@@ -107,6 +107,6 @@ void dbg_print_blocks(void) {
     }
 }
 
-bool dbg_is_memory_clear(void) {
+extern bool dbg_is_memory_clear(void) {
     return !block_list_size;
 }

@@ -13,47 +13,38 @@
 #include "json.h"
 
 int main(int argc, char ** argv) {
-    int file;
-    char * memory, * buffer;
-    struct stat info;
-    struct jsonValue * value;
-    int result;
-    size_t size;
-    file   = -1;
-    memory = NULL;
-    value  = NULL;
-    result = EXIT_SUCCESS;
-    memset(&info, 0, sizeof(struct stat));
+    int result = EXIT_SUCCESS;
     if (argc != 2) {
         fprintf(stderr, "Usage: %s ./file.json\n", argv[0]);
         result = EXIT_FAILURE;
         goto finish;
     }
-    file = open(argv[1], O_RDONLY);
+    int file = open(argv[1], O_RDONLY);
     if (file < 0) {
         perror("open");
         result = EXIT_FAILURE;
         goto finish;
     }
+    struct stat info = { 0 };
     if (fstat(file, &info) < 0) {
         perror("fstat");
         result = EXIT_FAILURE;
         goto finish;
     };
-    memory = mmap(NULL, info.st_size, PROT_READ, MAP_SHARED, file, 0);
+    char *memory = mmap(NULL, info.st_size, PROT_READ, MAP_SHARED, file, 0);
     if (MAP_FAILED == memory) {
         result = EXIT_FAILURE;
         goto finish;
     }
-    value = json_parse(memory);
+    struct jsonValue *value = json_parse(memory);
     if (!value) {
         fprintf(stderr, "Failed to parse json.\n");
         result = EXIT_FAILURE;
         goto finish;
     }
     setvbuf(stdout, NULL, _IOFBF, 0);
-    size = json_pretty_print(NULL, 0, value);
-    buffer = malloc(size);
+    size_t size = json_pretty_print(NULL, 0, value);
+    char *buffer = malloc(size);
     json_pretty_print(buffer, size, value);
     puts(buffer);
 finish:

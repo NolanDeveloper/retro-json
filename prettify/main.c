@@ -1,31 +1,24 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #include <assert.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "json.h"
 
-#define KB(n)   (1024 * (n))
-#define MB(n) KB(1024 * (n))
-#define MAX_SUPPORTED_FILE_SIZE MB(100)
-
-#define TAB_SIZE 4
-
-#define BUFFER_SIZE KB(20)
-
-static char buffer[BUFFER_SIZE];
-
 int main(int argc, char ** argv) {
     int file;
-    char * memory;
+    char * memory, * buffer;
     struct stat info;
     struct jsonValue * value;
     int result;
+    size_t size;
     file   = -1;
     memory = NULL;
     value  = NULL;
@@ -47,11 +40,6 @@ int main(int argc, char ** argv) {
         result = EXIT_FAILURE;
         goto finish;
     };
-    if (info.st_size > MAX_SUPPORTED_FILE_SIZE) {
-        fprintf(stderr, "Input file is too big.\n");
-        result = EXIT_FAILURE;
-        goto finish;
-    }
     memory = mmap(NULL, info.st_size, PROT_READ, MAP_SHARED, file, 0);
     if (MAP_FAILED == memory) {
         result = EXIT_FAILURE;
@@ -64,7 +52,9 @@ int main(int argc, char ** argv) {
         goto finish;
     }
     setvbuf(stdout, NULL, _IOFBF, 0);
-    json_pretty_print(buffer, sizeof(buffer), value);
+    size = json_pretty_print(NULL, 0, value);
+    buffer = malloc(size);
+    json_pretty_print(buffer, size, value);
     puts(buffer);
 finish:
     fflush(stdout);

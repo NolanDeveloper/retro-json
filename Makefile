@@ -13,7 +13,7 @@ else
 	ERR := $(error $$(MODE) = $(MODE) but should be one of: debug debug-fast release)
 endif
 
-CFLAGS     += -std=c89
+CFLAGS     += -std=c11
 CFLAGS     += -pedantic
 CFLAGS     += -Wall
 CFLAGS     += -Wextra

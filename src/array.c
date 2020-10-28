@@ -1,6 +1,8 @@
-#include <stddef.h>
 #include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdlib.h>
+#include <threads.h>
 
 #include "json.h"
 #include "json_internal.h"
@@ -18,9 +20,10 @@ extern void json_array_init(struct jsonArray * array) {
 }
 
 extern void json_array_free_internal(struct jsonArray * array) {
-    size_t i;
-    if (!array) return;
-    for (i = 0; i < array->size; ++i) {
+    if (!array) {
+        return;
+    }
+    for (size_t i = 0; i < array->size; ++i) {
         json_value_free(array->values[i]);
     }
     json_free(array->values);
@@ -29,22 +32,29 @@ extern void json_array_free_internal(struct jsonArray * array) {
     array->values = NULL;
 }
 
-static int json_array_ensure_has_free_space(struct jsonArray * array, size_t n) {
-    size_t new_capacity;
-    if (array->size + n <= array->capacity) return 1;
-    new_capacity = array->capacity;
+static bool json_array_ensure_has_free_space(struct jsonArray * array, size_t n) {
+    if (array->size + n <= array->capacity) {
+        return true;
+    }
+    size_t new_capacity = array->capacity;
     do {
         new_capacity = new_capacity ? 2 * new_capacity : INITIAL_CAPACITY;
     } while (array->size + n > new_capacity);
-    array->values = json_realloc(array->values, new_capacity * sizeof(struct jsonValue *));
+    struct jsonValue ** new_values = json_realloc(array->values, new_capacity * sizeof(struct jsonValue *));
+    if (!new_values) {
+        return false;
+    }
+    array->values = new_values;
     array->capacity = new_capacity;
-    return 1;
+    return true;
 }
 
-extern int json_array_append(struct jsonArray * array, struct jsonValue * value) {
-    if (!json_array_ensure_has_free_space(array, 1)) return 0;
+extern bool json_array_append(struct jsonArray * array, struct jsonValue * value) {
+    if (!json_array_ensure_has_free_space(array, 1)) {
+        return false;
+    }
     array->values[array->size++] = value;
-    return 1;
+    return true;
 }
 
 size_t json_value_array_size(struct jsonValue * array) {

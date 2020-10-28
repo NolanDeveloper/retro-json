@@ -1,14 +1,14 @@
 struct jsonString {
     size_t capacity;
     size_t size;
-    char * data;
+    char *data;
     unsigned hash;
 };
 
 struct jsonArray {
     size_t capacity;
     size_t size;
-    struct jsonValue * * values;
+    struct jsonValue **values;
 };
 
 struct jsonObjectEntry;
@@ -18,10 +18,10 @@ struct jsonObject {
     /*! Hash table */
     size_t capacity;
     size_t size;
-    struct jsonObjectEntry * entries;
+    struct jsonObjectEntry *entries;
     /*! List of entries in the order they were added */
-    struct jsonObjectEntry * first;
-    struct jsonObjectEntry * last;
+    struct jsonObjectEntry *first;
+    struct jsonObjectEntry *last;
 };
 
 enum jsonValueKind { JVK_STR, JVK_NUM, JVK_OBJ, JVK_ARR, JVK_BOOL, JVK_NULL };
@@ -33,15 +33,15 @@ struct jsonValue {
         struct jsonString string;
         struct jsonObject object;
         struct jsonArray array;
-        int boolean;
+        bool boolean;
     } v;
 };
 
 struct jsonObjectEntry {
-    struct jsonString * key;
-    struct jsonValue * value;
-    struct jsonObjectEntry * next;
-    struct jsonObjectEntry * prev;
+    struct jsonString *key;
+    struct jsonValue *value;
+    struct jsonObjectEntry *next;
+    struct jsonObjectEntry *prev;
 };
 
 struct jsonValue * json_value_create_number(double number);
@@ -50,8 +50,9 @@ struct jsonValue * json_value_create_object(void);
 struct jsonValue * json_value_create_array(void);
 struct jsonValue * json_value_create_boolean(int boolean);
 struct jsonValue * json_value_create_null(void);
-int json_value_object_add(struct jsonValue * object, const char * key, struct jsonValue * value);
-int json_value_array_append(struct jsonValue * array, struct jsonValue * value);
+
+bool json_value_object_add(struct jsonValue * object, const char * key, struct jsonValue * value);
+bool json_value_array_append(struct jsonValue * array, struct jsonValue * value);
 /*! @todo int json_value_array_remove */
 struct jsonValue * json_value_object_lookup(struct jsonValue * object, const char * key);
 size_t json_value_array_size(struct jsonValue * array);

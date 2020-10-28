@@ -1,6 +1,10 @@
+#include <float.h>
+#include <math.h>
+#include <stdbool.h>
 #include <stddef.h>
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
+#include <threads.h>
 
 #include "json.h"
 
@@ -55,18 +59,24 @@ static size_t print_json_string(char * out, size_t size, struct jsonString * str
 
 /* does not put null at the end */
 static size_t print_json_number(char * out, size_t size, double number) {
-    char buffer[10 * 1024];
     size_t t;
     long n;
-    if ((long)number == number) {
-        n = sprintf(buffer, "%ld", (long) number);
+    if (isnan(number)) {
+        n = snprintf(out, out ? size : 0, "null");
     } else {
-        n = sprintf(buffer, "%f", number); /*!< @todo we are at c89 ooh this sucks so much GOD PLEASE KILL ME :-( */
+        if (isinf(number) == 1) {
+            number = DBL_MAX;
+        } else if (isinf(number) == -1) {
+            number = DBL_MIN;
+        }
+        if ((long)number == number) {
+            n = snprintf(out, out ? size : 0, "%ld", (long) number);
+        } else {
+            n = snprintf(out, out ? size : 0, "%f", number);
+        }
     }
     t = n < 0 ? 0 : (size_t) n;
     if (!out) return t;
-    if (t > size) t = size;
-    memcpy(out, buffer, t);
     return t;
 }
 

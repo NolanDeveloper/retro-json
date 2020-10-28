@@ -1,7 +1,8 @@
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
 #include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 struct Block {
     struct Block * next;
@@ -103,6 +104,6 @@ void dbg_print_blocks(void) {
     }
 }
 
-int dbg_is_memory_clear(void) {
+bool dbg_is_memory_clear(void) {
     return !block_list_size;
 }

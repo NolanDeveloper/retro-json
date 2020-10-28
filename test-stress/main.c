@@ -1,6 +1,8 @@
-#include <stdlib.h>
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <threads.h>
 
 #include "json.h"
 #include "json_internal.h"
@@ -193,9 +195,6 @@ int main(int argc, char * argv[]) {
         if (!dbg_is_memory_clear()) {
             printf(RED "STRESS TEST FAILED\n" RESET);
             printf("Attempt #%d\n", i);
-            printf("========================================\n");
-            printf("%s\n", json_str_buffer);
-            printf("========================================\n");
             printf("There was a memory leak.\n");
             dbg_print_blocks();
             return EXIT_FAILURE;

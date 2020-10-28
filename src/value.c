@@ -1,4 +1,6 @@
+#include <stdbool.h>
 #include <stdlib.h>
+#include <threads.h>
 
 #include "json.h"
 #include "json_internal.h"

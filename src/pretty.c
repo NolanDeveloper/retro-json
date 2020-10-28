@@ -1,5 +1,6 @@
 #include <float.h>
 #include <math.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -8,147 +9,136 @@
 
 #include "json.h"
 
-#define TAB_SIZE 4
+#define TAB "\t"
 
-static size_t print_json_value(char *out, size_t size, struct jsonValue *value, unsigned indent);
+static thread_local char *out_begin;
+static thread_local size_t out_size;
+static thread_local size_t position;
+static thread_local unsigned indent;
 
-static size_t print_str(char *out, size_t size, const char *string) {
-    size_t len;
-    len = strlen(string);
-    if (!out) return len;
-    if (size < len) len = size;
-    memcpy(out, string, len);
-    return len;
+static void print_json_value(struct jsonValue *value);
+
+static void jprintf(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    size_t size = position < out_size ? out_size - position : 0;
+    int n = vsnprintf(out_begin + position, size, fmt, args);
+    va_end(args);
+    position += n;
 }
 
-static size_t print_indent(char *out, size_t size, unsigned indent) {
-    unsigned t;
-    if (!out) return indent;
-    if (size < indent) indent = size;
-    t = indent;
-    while (t) {
-        *out++ = ' ';
-        --t;
+static void print_indent(void) {
+    for (unsigned i = 0; i < indent; ++i) {
+        jprintf(TAB);
     }
-    return indent;
 }
 
-static size_t print_json_string(char *out, size_t size, struct jsonString *string) {
-    char buf[3];
-    size_t n;
-    char *p;
-    n = 0;
-    p = string->data;
-    n += print_str(out ? out + n : NULL, size - n, "\"");
-    while (*p) {
-        if (*p == '\"' || *p == '\\') {
-            buf[0] = '\\';
-            buf[1] = *p;
-            buf[2] = '\0';
+static void print_json_string(struct jsonString *string) {
+    jprintf("\"");
+    for (char c, *p = string->data; (c = *p); ++p) {
+        if (c == '\"' || c == '\\') {
+            jprintf("\\%c", c);
         } else {
-            buf[0] = *p;
-            buf[1] = '\0';
+            jprintf("%c", c);
         }
-        n += print_str(out ? out + n : NULL, size - n, buf);
-        ++p;
     }
-    n += print_str(out ? out + n : NULL, size - n, "\"");
-    return n;
+    jprintf("\"");
 }
 
-static size_t print_json_number(char *out, size_t size, double number) {
-    size_t t;
-    long n;
+static void print_json_number(double number) {
     if (isnan(number)) {
-        n = snprintf(out, out ? size : 0, "null");
+        jprintf("null");
+        return;
+    } 
+    if (isinf(number) == 1) {
+        number = DBL_MAX;
+    } else if (isinf(number) == -1) {
+        number = DBL_MIN;
+    }
+    if ((long) number == number) {
+        jprintf("%ld", (long) number);
     } else {
-        if (isinf(number) == 1) {
-            number = DBL_MAX;
-        } else if (isinf(number) == -1) {
-            number = DBL_MIN;
-        }
-        if ((long)number == number) {
-            n = snprintf(out, out ? size : 0, "%ld", (long) number);
-        } else {
-            n = snprintf(out, out ? size : 0, "%f", number);
-        }
+        jprintf("%f", number);
     }
-    t = n < 0 ? 0 : (size_t) n;
-    if (!out) return t;
-    return t;
 }
 
-static size_t print_json_object(char *out, size_t size, struct jsonObject *object, unsigned indent) {
-    struct jsonObjectEntry *entry;
-    size_t n;
-    n = 0;
+static void print_json_object(struct jsonObject *object) {
     if (!object->size) {
-        n += print_str(out ? out + n : NULL, size - n, "{ }"); 
-        return n;
+        jprintf("{ }");
+        return;
     }
-    n += print_str(out ? out + n : NULL, size - n, "{\n"); 
-    entry = object->first;
-    if (entry) {
-        n += print_indent(out ? out + n : NULL, size - n, indent + TAB_SIZE);
-        n += print_json_string(out ? out + n : NULL, size - n, entry->key);
-        n += print_str(out ? out + n : NULL, size - n, ": ");
-        n += print_json_value(out ? out + n : NULL, size - n, entry->value, indent + TAB_SIZE);
-        entry = entry->next;
+    jprintf("{\n");
+    bool latch = false;
+    for (struct jsonObjectEntry *entry = object->first; entry; entry = entry->next) {
+        if (latch) {
+            jprintf(",\n");
+        }
+        latch = true;
+        print_indent();
+        print_json_string(entry->key);
+        jprintf(": ");
+        ++indent;
+        print_json_value(entry->value);
+        --indent;
     }
-    while (entry) {
-        n += print_str(out ? out + n : NULL, size - n, ",\n");
-        n += print_indent(out ? out + n : NULL, size - n, indent + TAB_SIZE);
-        n += print_json_string(out ? out + n : NULL, size - n, entry->key);
-        n += print_str(out ? out + n : NULL, size - n, ": ");
-        n += print_json_value(out ? out + n : NULL, size - n, entry->value, indent + TAB_SIZE);
-        entry = entry->next;
-    }
-    n += print_str(out ? out + n : NULL, size - n, "\n"); 
-    n += print_indent(out ? out + n : NULL, size - n, indent);
-    n += print_str(out ? out + n : NULL, size - n, "}"); 
-    return n;
+    jprintf("\n");
+    print_indent();
+    jprintf("}");
 }
 
-static size_t print_json_array(char *out, size_t size, struct jsonArray *array, unsigned indent) {
-    size_t n, i;
-    n = 0;
+static void print_json_array(struct jsonArray *array) {
     if (!array->size) {
-        n += print_str(out ? out + n : NULL, size - n, "[ ]"); 
-        return n;
+        jprintf("[ ]");
+        return;
     }
-    n += print_str(out ? out + n : NULL, size - n, "[\n");
-    for (i = 0; i < array->size; ++i) {
-        if (i) n += print_str(out ? out + n : NULL, size - n, ",\n");
-        n += print_indent(out ? out + n : NULL, size - n, indent + TAB_SIZE);
-        n += print_json_value(out ? out + n : NULL, size - n, array->values[i], indent + TAB_SIZE);
+    jprintf("[\n");
+    for (size_t i = 0; i < array->size; ++i) {
+        if (i) {
+            jprintf(",\n");
+        }
+        print_indent();
+        ++indent;
+        print_json_value(array->values[i]);
+        --indent;
     }
-    n += print_str(out ? out + n : NULL, size - n, "\n"); 
-    n += print_indent(out ? out + n : NULL, size - n, indent);
-    n += print_str(out ? out + n : NULL, size - n, "]");
-    return n;
+    jprintf("\n");
+    print_indent();
+    jprintf("]");
 }
 
-static size_t print_json_value(char *out, size_t size, struct jsonValue *value, unsigned indent) {
+static void print_json_value(struct jsonValue *value) {
     switch (value->kind) {
-    case JVK_STR:  return print_json_string(out, size, &value->v.string);
-    case JVK_NUM:  return print_json_number(out, size, value->v.number);
-    case JVK_OBJ:  return print_json_object(out, size, &value->v.object, indent);
-    case JVK_ARR:  return print_json_array(out, size, &value->v.array, indent);
-    case JVK_BOOL: return print_str(out, size, value->v.boolean ? "true" : "false");
+    case JVK_STR:  
+        print_json_string(&value->v.string);
+        break;
+    case JVK_NUM:  
+        print_json_number(value->v.number);
+        break;
+    case JVK_OBJ:  
+        print_json_object(&value->v.object);
+        break;
+    case JVK_ARR:  
+        print_json_array(&value->v.array);
+        break;
+    case JVK_BOOL: 
+        jprintf(value->v.boolean ? "true" : "false");
+        break;
     case JVK_NULL: 
-    default:       return print_str(out, size, "null");
+    default:       
+        jprintf("null");
+        break;
     }
 }
 
-/* puts null at the end */
-/* returns number of bytes writen or that would have been written if out is NULL */
 extern size_t json_pretty_print(char *out, size_t size, struct jsonValue *value) {
-    size_t n;
-    if (!value) {
-        if (out && size) *out = '\0';
-        return 1;
+    out_begin = out;
+    out_size = size;
+    position = 0;
+    indent = 0;
+    print_json_value(value);
+    if (size) {
+        out[size - 1] = '\0';
     }
-    n = print_json_value(out, size - 1, value, 0);
-    if (out) out[n] = '\0';
-    return n + 1;
+    out_begin = NULL;
+    return position;
 }

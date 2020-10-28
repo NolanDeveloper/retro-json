@@ -61,6 +61,20 @@ void json_value_free(struct jsonValue * value);
 
 struct jsonValue * json_parse(const char * json);
 
+/*! @brief Pretty prints json value.
+ *
+ * Acts like snprint. Passing size = 0 allows to precalculate out buffer size.
+ * Then you may allocate buffer of required size and pass to the function
+ * again.
+ *
+ * If size != 0 output guaranteed have '\0' at the end.
+ *
+ * @param out Output buffer or NULL.
+ * @param size Size of out buffer. The function doesn't write more than that.
+ * @param value Json value to print.
+ * @returns Number of bytes (excluding terminating '\0') that would be written
+ * if output buffer was of infinite size.
+ */
 size_t json_pretty_print(char * out, size_t size, struct jsonValue * value);
 
 

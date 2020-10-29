@@ -11,7 +11,11 @@ const char *error_out_of_memory = "out of memory";
 
 thread_local const char *error;
 
-void set_error(const char *e) {
+extern const char *json_strerror(void) {
+    return error ? error : "NULL";
+}
+
+extern void set_error(const char *e) {
     if (error && error != error_out_of_memory) {
         json_free((char *) error);
     }

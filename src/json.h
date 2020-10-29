@@ -76,5 +76,5 @@ struct jsonValue * json_parse(const char * json);
  */
 size_t json_pretty_print(char * out, size_t size, struct jsonValue * value);
 
-
+const char *json_strerror(void);
 

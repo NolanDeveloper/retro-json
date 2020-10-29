@@ -93,7 +93,8 @@ extern bool json_object_add(struct jsonObject *object, struct jsonString *key, s
     struct jsonObjectEntry *entry = &object->entries[key->hash % object->capacity]; 
     while (entry->key) {
         if (entry->key->hash == key->hash && !strcmp(entry->key->data, key->data)) {
-            return 0;
+            errorf("Duplicate keys");
+            return false;
         }
         if (++entry == fence) {
             entry = object->entries;

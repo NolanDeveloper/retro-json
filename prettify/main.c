@@ -38,7 +38,7 @@ int main(int argc, char ** argv) {
     }
     struct jsonValue *value = json_parse(memory);
     if (!value) {
-        fprintf(stderr, "Failed to parse json.\n");
+        fprintf(stderr, "Failed to parse json: %s.\n", json_strerror());
         result = EXIT_FAILURE;
         goto finish;
     }

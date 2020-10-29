@@ -87,16 +87,15 @@ static bool append_unicode_code_point(struct jsonString *string, char32_t c) {
 static bool parse_string(struct jsonString *string) {
     assert('"' == peek());
     next_char();
-    char *end = strchr(json_it, '\"');
-    if (!end) {
+    char *end_or_slash = strpbrk(json_it, "\"\\");
+    if (!end_or_slash) {
         errorf("Unterminated string.");
         return false;
     }
-    size_t n = end - json_it;
-    char *esc = memchr(json_it, '\\', n);
-    if (!esc) {
+    if (*end_or_slash == '\"') {
+        size_t n = end_or_slash - json_it;
         json_string_init_mem(string, json_it, n);
-        json_it = end + 1;
+        json_it = end_or_slash + 1;
         return true;
     }
     while (1) {

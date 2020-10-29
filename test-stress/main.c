@@ -29,7 +29,7 @@ static char * generate_cstr(void) {
         /*c = rand() % (127 - 20) + 20; */
         /*if (c == '"' || c == '\\') *p++ = '\\'; */
         c = alphabet[rand() % (sizeof(alphabet) - 1)];
-        *p++ = c; /*! @todo add unicode and escape sequences */
+        *p++ = c; 
     }
     *p++ = '\0';
     return cstr_buffer;

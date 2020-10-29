@@ -1,10 +1,21 @@
+Hot:
+* Add function for removing element of an array.
+* Add function for removing element of an object.
+* Add lookup by path function.
+* Add pointer to parent as often it might be useful.
+* Add extended character set into stress test.
+* Fix compliance issues found using JSONTestSuite.
 * In parser and in all procedures working with Objects recurstion depth must be limited.
-* Implement json object as hashmap with linear probing.
-    * Implement removing elements
 * Add as much documentation as possible
 * Add cool readme
-* Parser should be more inclusive. e.g. parse trailing comma
-* Add proper error handling with to pretty printer
+* Parser should be more inclusive. e.g. parse trailing comma (?) (take a look at JSONTestSuite)
+
+Complicated:
+* Refactoring. Decide what should belong to api and what should stay internal.
+  Give better names for external functions. Give more distinctive names for
+  internal.
+
+Research area:
 * Implement precomputation of sizes for all json nodes: strings, arrays, objects; as memory their growth takes
   a lot of time during parsing and doesn't do well with cache locality.
   Parsing may be done in two passes. The first one collects sizes of all structures. The second one builds json nodes.

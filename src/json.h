@@ -53,7 +53,6 @@ struct jsonValue * json_value_create_null(void);
 
 bool json_value_object_add(struct jsonValue * object, const char * key, struct jsonValue * value);
 bool json_value_array_append(struct jsonValue * array, struct jsonValue * value);
-/*! @todo int json_value_array_remove */
 struct jsonValue * json_value_object_lookup(struct jsonValue * object, const char * key);
 size_t json_value_array_size(struct jsonValue * array);
 struct jsonValue * json_value_array_at(struct jsonValue * array, size_t index);

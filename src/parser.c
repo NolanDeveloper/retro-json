@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <threads.h>
+#include <uchar.h>
 
 #include "json.h"
 #include "json_internal.h"
@@ -40,10 +41,8 @@ fail:
 }
 
 static char peek(void) {
-    if (json_it < json_end) {
-        return *json_it;
-    }
-    return '\0';
+    assert(json_it <= json_end);
+    return *json_it;
 }
 
 static void next_char(void) {
@@ -71,23 +70,35 @@ static bool consume(const char *str) {
     return true;
 }
 
-/*! Appends utf-32 char to utf-8 code unit sequence in jsonString. */
-static bool append_unicode_code_point(struct jsonString *unescaped, uint32_t hex) {
-    if (hex <= 0x007f) {
-        return json_string_append(unescaped, (char) hex);
-    } else if (0x0080 <= hex && hex <= 0x07ff) {
-        return json_string_append(unescaped, (char) (0xc0 | hex >> 6))
-            && json_string_append(unescaped, (char) (0x80 | (hex & 0x3f)));
+/*! Appends UTF-32 char to UTF-8 code unit sequence in jsonString. */
+static bool append_unicode_code_point(struct jsonString *string, char32_t c) {
+    if (c <= 0x007f) {
+        return json_string_append(string, (char) c);
+    } else if (0x0080 <= c && c <= 0x07ff) {
+        return json_string_append(string, (char) (0xc0 | c >> 6))
+            && json_string_append(string, (char) (0x80 | (c & 0x3f)));
     } else {
-        return json_string_append(unescaped, (char) (0xe0 | hex >> 12))
-            && json_string_append(unescaped, (char) (0x80 | ((hex >> 6) & 0x3f)))
-            && json_string_append(unescaped, (char) (0x80 | (hex & 0x3f)));
+        return json_string_append(string, (char) (0xe0 | c >> 12))
+            && json_string_append(string, (char) (0x80 | ((c >> 6) & 0x3f)))
+            && json_string_append(string, (char) (0x80 | (c & 0x3f)));
     }
 }
 
 static bool parse_string(struct jsonString *string) {
     assert('"' == peek());
     next_char();
+    char *end = strchr(json_it, '\"');
+    if (!end) {
+        errorf("Unterminated string.");
+        return false;
+    }
+    size_t n = end - json_it;
+    char *esc = memchr(json_it, '\\', n);
+    if (!esc) {
+        json_string_init_mem(string, json_it, n);
+        json_it = end + 1;
+        return true;
+    }
     while (1) {
         switch (peek()) {
         case '"':
@@ -149,7 +160,7 @@ static bool parse_string(struct jsonString *string) {
                 }
                 buf[sizeof(buf) - 1] = '\0';
                 char *end;
-                uint32_t hex = strtoul(buf, &end, 16);
+                char32_t hex = strtoul(buf, &end, 16);
                 if (end != &buf[4]) {
                     errorf("Bad Unicode escape sequence.");
                     return false;
@@ -193,28 +204,11 @@ static bool parse_string(struct jsonString *string) {
                 return false;
             }
             break;
-        default: {
-            int left = utf8_bytes_left[(unsigned char) peek()];
-            if (left < 0) {
-                errorf("Invalid UTF-8 sequence.");
-                return false;
-            }
-            if (!json_string_append(string, peek())) {
-                return false;
-            }
+        default: 
+            json_string_append(string, peek());
             next_char();
-            for (int i = 0; i < left; ++i) {
-                if (TR != utf8_bytes_left[(unsigned char) peek()]) {
-                    errorf("Invalid UTF-8 sequence.");
-                    return false;
-                }
-                if (!json_string_append(string, peek())) {
-                    return false;
-                }
-                next_char();
-            }
             break;
-        }}
+        }
     }
 }
 

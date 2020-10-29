@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <threads.h>
+#include <uchar.h>
 
 #include "json.h"
 #include "json_internal.h"
@@ -23,9 +24,7 @@ extern void json_string_init(struct jsonString *string) {
 
 extern bool json_string_init_str(struct jsonString *string, const char *str) {
     assert(string);
-    if (!str) {
-        return false;
-    }
+    assert(str);
     string->size = string->capacity = strlen(str) + 1;
     string->data = json_malloc(string->size);
     if (!string->data) {
@@ -33,6 +32,21 @@ extern bool json_string_init_str(struct jsonString *string, const char *str) {
     }
     strcpy(string->data, str);
     string->hash = json_string_hash(str);
+    return 1;
+}
+
+extern bool json_string_init_mem(struct jsonString *string, const char *mem, size_t n) {
+    assert(string);
+    assert(mem);
+    assert(n);
+    string->size = string->capacity = n + 1;
+    string->data = json_malloc(string->size);
+    if (!string->data) {
+        return false;
+    }
+    memcpy(string->data, mem, n);
+    string->data[n] = '\0';
+    string->hash = json_string_hash(string->data);
     return 1;
 }
 
@@ -76,7 +90,10 @@ extern bool json_string_append(struct jsonString *string, char c) {
 }
 
 extern bool json_string_shrink(struct jsonString *string) {
-    if (!string->capacity) return true;
+    assert(string);
+    if (!string->capacity) {
+        return true;
+    }
     assert(string->size);
     void *new_data = json_realloc(string->data, string->size);
     if (new_data) {

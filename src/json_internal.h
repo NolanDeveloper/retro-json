@@ -28,6 +28,7 @@ void json_free_(void *ptr);
 
 void json_string_init(struct jsonString *string);
 bool json_string_init_str(struct jsonString *string, const char *str);
+bool json_string_init_mem(struct jsonString *string, const char *mem, size_t n);
 void json_string_free_internal(struct jsonString *string);
 bool json_string_append(struct jsonString *string, char c);
 bool json_string_shrink(struct jsonString *string);
@@ -45,13 +46,9 @@ struct jsonValue *json_object_at(struct jsonObject *object, const char *key);
 
 void json_value_free_internal(struct jsonValue *value);
 
-/*! Marker for trailing bytes */
-#define TR (-1)
-
-/*! Marker for illegal bytes */
-#define IL (-2)
-
-extern int utf8_bytes_left[256]; /*!< utf8_bytes_left[code unit] = how long this code point is in utf8 - 1 */
+extern int u8len(char c);
+extern char32_t u8tou32(const char *u8);
+extern void u32tou16le(char32_t u32, char16_t out[2]);
 
 extern const char *error_out_of_memory;
 

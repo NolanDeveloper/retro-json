@@ -6,15 +6,18 @@
 #include <stdio.h>
 #include <string.h>
 #include <threads.h>
+#include <uchar.h>
 
 #include "json.h"
-
-#define TAB "\t"
+#include "json_internal.h"
 
 static thread_local char *out_begin;
 static thread_local size_t out_size;
 static thread_local size_t position;
 static thread_local unsigned indent;
+
+static thread_local const char *tab = "\t";
+static thread_local bool ascii_only = true;
 
 static void print_json_value(struct jsonValue *value);
 
@@ -29,17 +32,60 @@ static void jprintf(const char *fmt, ...) {
 
 static void print_indent(void) {
     for (unsigned i = 0; i < indent; ++i) {
-        jprintf(TAB);
+        jprintf("%s", tab);
     }
 }
 
 static void print_json_string(struct jsonString *string) {
     jprintf("\"");
-    for (char c, *p = string->data; (c = *p); ++p) {
-        if (c == '\"' || c == '\\') {
-            jprintf("\\%c", c);
-        } else {
-            jprintf("%c", c);
+    if (!ascii_only && !strchr(string->data, '\\') && !strchr(string->data, '\"')) {
+        jprintf("%s", string->data);
+    } else if (ascii_only) {
+        for (char c, *p = string->data; (c = *p); ++p) {
+            int n = u8len(c);
+            if (n > 1) {
+                char16_t u16[2];
+                u32tou16le(u8tou32(p), u16);
+                jprintf("\\u%04x", u16[0]);
+                if (u16[1]) {
+                    jprintf("\\u%04x", u16[1]);
+                }
+                p += n - 1;
+                continue;
+            }
+            switch (c) {
+            case '\"':
+            case '\\':
+            case '/':
+                jprintf("\\%c", c);
+                break;
+            case '\b':
+                jprintf("\\b");
+                break;
+            case '\f':
+                jprintf("\\f");
+                break;
+            case '\n':
+                jprintf("\\n");
+                break;
+            case '\r':
+                jprintf("\\r");
+                break;
+            case '\t':
+                jprintf("\\t");
+                break;
+            default:
+                jprintf("%c", c);
+                break;
+            }
+        } 
+    } else {
+        for (char c, *p = string->data; (c = *p); ++p) {
+            if (c == '\"' || c == '\\') {
+                jprintf("\\%c", c);
+            } else {
+                jprintf("%c", c);
+            }
         }
     }
     jprintf("\"");
@@ -68,6 +114,7 @@ static void print_json_object(struct jsonObject *object) {
         return;
     }
     jprintf("{\n");
+    ++indent;
     bool latch = false;
     for (struct jsonObjectEntry *entry = object->first; entry; entry = entry->next) {
         if (latch) {
@@ -77,10 +124,9 @@ static void print_json_object(struct jsonObject *object) {
         print_indent();
         print_json_string(entry->key);
         jprintf(": ");
-        ++indent;
         print_json_value(entry->value);
-        --indent;
     }
+    --indent;
     jprintf("\n");
     print_indent();
     jprintf("}");
@@ -91,16 +137,16 @@ static void print_json_array(struct jsonArray *array) {
         jprintf("[ ]");
         return;
     }
+    ++indent;
     jprintf("[\n");
     for (size_t i = 0; i < array->size; ++i) {
         if (i) {
             jprintf(",\n");
         }
         print_indent();
-        ++indent;
         print_json_value(array->values[i]);
-        --indent;
     }
+    --indent;
     jprintf("\n");
     print_indent();
     jprintf("]");

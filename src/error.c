@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <threads.h>
+#include <uchar.h>
 
 #include "json.h"
 #include "json_internal.h"

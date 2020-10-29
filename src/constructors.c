@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <threads.h>
+#include <uchar.h>
 
 #include "json.h"
 #include "json_internal.h"
@@ -16,6 +17,10 @@ struct jsonValue *json_value_create_number(double number) {
 }
 
 struct jsonValue *json_value_create_string(const char *string) {
+    if (!string) {
+        errorf("string == NULL");
+        return NULL;
+    }
     struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;

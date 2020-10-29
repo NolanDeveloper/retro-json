@@ -16,7 +16,6 @@
 static bool parse_value(struct jsonValue *value);
 
 thread_local const char *json_begin; //!< holds start of json string during json_parse recursive calls 
-thread_local const char *json_end; 
 thread_local const char *json_it; 
 
 extern struct jsonValue *json_parse(const char *json) {
@@ -29,39 +28,24 @@ extern struct jsonValue *json_parse(const char *json) {
         goto fail;
     }
     json_begin = json_it = json;
-    json_end = json + strlen(json);
     if (!parse_value(value)) {
         goto fail;
     }
-    json_begin = json_it = json_end = NULL;
+    json_begin = json_it = NULL;
     return value;
 fail:
     json_free(value);
     return NULL;
 }
 
-static char peek(void) {
-    assert(json_it <= json_end);
-    return *json_it;
-}
-
-static void next_char(void) {
-    assert(json_it < json_end);
-    ++json_it;
-}
-
 static void skip_spaces(void) {
-    while (isspace(peek())) {
-        next_char();
+    while (isspace(*json_it)) {
+        ++json_it;
     }
 }
 
 static bool consume(const char *str) {
     size_t n = strlen(str);
-    if ((size_t) (json_end - json_it) < n) {
-        errorf("unexpected end of input");
-        return false;
-    }
     if (strncmp(str, json_it, n)) {
         errorf("'%s' was expected", str);
         return false;
@@ -85,11 +69,11 @@ static bool append_unicode_code_point(struct jsonString *string, char32_t c) {
 }
 
 static bool parse_string(struct jsonString *string) {
-    assert('"' == peek());
-    next_char();
+    assert('"' == *json_it);
+    ++json_it;
     char *end_or_slash = strpbrk(json_it, "\"\\");
     if (!end_or_slash) {
-        errorf("Unterminated string.");
+        errorf("Unterminated strin.");
         return false;
     }
     if (*end_or_slash == '\"') {
@@ -99,7 +83,7 @@ static bool parse_string(struct jsonString *string) {
         return true;
     }
     while (1) {
-        switch (peek()) {
+        switch (*json_it) {
         case '"':
             if (!json_string_append(string, '\0')) {
                 return false;
@@ -107,81 +91,81 @@ static bool parse_string(struct jsonString *string) {
             if (!json_string_shrink(string)) {
                 return false;
             }
-            next_char();
+            ++json_it;
             return true;
         case '\\':
-            next_char();
-            switch (peek()) {
+            ++json_it;
+            switch (*json_it) {
             case '\\': 
             case '"': 
             case '/': 
-                if (!json_string_append(string, peek())) {
+                if (!json_string_append(string, *json_it)) {
                     return false;
                 }
-                next_char();
+                ++json_it;
                 break;
             case 'b': 
                 if (!json_string_append(string, '\b')) {
                     return false;
                 }
-                next_char();
+                ++json_it;
                 break;
             case 'f': 
                 if (!json_string_append(string, '\f')) {
                     return false;
                 }
-                next_char();
+                ++json_it;
                 break;
             case 'n': 
                 if (!json_string_append(string, '\n')) {
                     return false;
                 }
-                next_char();
+                ++json_it;
                 break;
             case 'r':
                 if (!json_string_append(string, '\r')) {
                     return false;
                 }
-                next_char();
+                ++json_it;
                 break;
             case 't':
                 if (!json_string_append(string, '\t')) {
                     return false;
                 }
-                next_char();
+                ++json_it;
                 break;
             case 'u': {
                 char buf[5];
-                next_char();
+                ++json_it;
                 for (uint8_t i = 0; i < sizeof(buf) - 1; ++i) {
-                    buf[i] = peek();
-                    next_char();
+                    buf[i] = *json_it;
+                    ++json_it;
                 }
                 buf[sizeof(buf) - 1] = '\0';
                 char *end;
                 char32_t hex = strtoul(buf, &end, 16);
                 if (end != &buf[4]) {
-                    errorf("Bad Unicode escape sequence.");
+                    errorf("Bad Unicode escape sequence");
                     return false;
                 }
                 if (hex >> 11ul == 0x1B) { /* this is utf-16 surrogate pair either high or low */
                     bool is_little_end = (hex >> 10ul) & 1ul;
                     if (consume("\\u")) {
-                        errorf("Bad Unicode escape sequence.");
+                        errorf("Bad Unicode escape sequence");
                         return false;
                     }
                     for (uint8_t i = 0; i < sizeof(buf) - 1; ++i) {
-                        buf[i] = peek();
-                        next_char();
+                        buf[i] = *json_it;
+                        ++json_it;
                     }
                     buf[sizeof(buf) - 1] = '\0';
                     uint32_t surrogate = strtoul(buf, &end, 16);
                     if (end != &buf[4]) {
-                        errorf("Bad Unicode escape sequence.");
+                        errorf("Bad Unicode escape sequence");
                         return false;
                     }
                     if (((surrogate >> 10ul) & 1ul) == is_little_end) {
-                        errorf("Bad Unicode escape sequence.");
+                        errorf("Bad Unicode escape sequence");
                         return false;
                     }
                     hex       &= (1ul << 10ul) - 1ul;
@@ -199,13 +183,13 @@ static bool parse_string(struct jsonString *string) {
                 break;
             }
             default:
-                errorf("Unknown escape sequence.");
+                errorf("Unknown escape sequence");
                 return false;
             }
             break;
         default: 
-            json_string_append(string, peek());
-            next_char();
+            json_string_append(string, *json_it);
+            ++json_it;
             break;
         }
     }
@@ -214,10 +198,10 @@ static bool parse_string(struct jsonString *string) {
 static bool parse_object(struct jsonObject *object) {
     struct jsonString *key = NULL;
     struct jsonValue *value = NULL;
-    assert('{' == peek());
-    next_char();
+    assert('{' == *json_it);
+    ++json_it;
     skip_spaces();
-    if ('}' == peek()) {
+    if ('}' == *json_it) {
         return true;
     }
     while (1) {
@@ -247,7 +231,7 @@ static bool parse_object(struct jsonObject *object) {
         key = NULL;
         value = NULL;
         skip_spaces();
-        if ('}' == peek()) {
+        if ('}' == *json_it) {
             assert(consume("}"));
             return true;
         }
@@ -266,10 +250,10 @@ fail:
 
 static bool parse_array(struct jsonArray *array) {
     struct jsonValue *value = NULL;
-    assert('[' == peek());
-    next_char();
+    assert('[' == *json_it);
+    ++json_it;
     skip_spaces();
-    if (']' == peek()) {
+    if (']' == *json_it) {
         return true;
     }
     while (1) {
@@ -285,7 +269,7 @@ static bool parse_array(struct jsonArray *array) {
         }
         value = NULL;
         skip_spaces();
-        if (']' == peek()) {
+        if (']' == *json_it) {
             assert(consume("]"));
             return true;
         }
@@ -358,7 +342,7 @@ static bool parse_value_number(struct jsonValue *value) {
 
 static bool parse_value(struct jsonValue *value) {
     skip_spaces();
-    switch (peek()) {
+    switch (*json_it) {
     case '{':
         return parse_value_object(value);
     case '[':

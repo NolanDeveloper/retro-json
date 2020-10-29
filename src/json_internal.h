@@ -57,7 +57,6 @@ extern thread_local const char *error;
 void set_error(const char *e);
 
 extern thread_local const char *json_begin; //!< holds start of json string during json_parse recursive calls 
-extern thread_local const char *json_end; 
 extern thread_local const char *json_it; 
 
 extern void errorf(const char *fmt, ...);

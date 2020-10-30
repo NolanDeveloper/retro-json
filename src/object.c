@@ -55,19 +55,19 @@ extern void json_object_free_internal(struct jsonObject *object) {
 static bool json_object_ensure_has_free_space(struct jsonObject *object) {
     assert(object);
     if (!object->entries) {
-        object->entries = json_calloc(INITIAL_CAPACITY *sizeof(struct jsonObjectEntry));
+        object->entries = json_calloc(INITIAL_CAPACITY * sizeof(struct jsonObjectEntry));
         if (!object->entries) {
             return false;
         }
         object->capacity = INITIAL_CAPACITY;
         return true;
     }
-    if ((object->size + 1) *3 / 2 < object->capacity) {
+    if ((object->size + 1) * 3 / 2 < object->capacity) {
         return true;
     }
     object->capacity *= 2;
     struct jsonObjectEntry *old_entries = object->entries;
-    object->entries = json_calloc(object->capacity *sizeof(struct jsonObjectEntry));
+    object->entries = json_calloc(object->capacity * sizeof(struct jsonObjectEntry));
     if (!object->entries) {
         return false;
     }

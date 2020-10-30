@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <float.h>
 #include <math.h>
 #include <stdarg.h>
@@ -37,18 +38,24 @@ static void print_indent(void) {
 }
 
 static void print_json_string(struct jsonString *string) {
+    assert(string);
     jprintf("\"");
-    if (!ascii_only && !strchr(string->data, '\\') && !strchr(string->data, '\"')) {
+    const char * must_be_escaped = 
+        "\"\\\x01\x02\x03\x04\x05\x06\x07"
+        "\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F"
+        "\x10\x11\x12\x13\x14\x15\x16\x17"
+        "\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F";
+    if (!ascii_only && !strpbrk(string->data, must_be_escaped)) {
         jprintf("%s", string->data);
-    } else if (ascii_only) {
+    } else {
         for (char c, *p = string->data; (c = *p); ++p) {
-            int n = u8len(c);
-            if (n > 1) {
-                char16_t u16[2];
-                u32tou16le(u8tou32(p), u16);
-                jprintf("\\u%04x", u16[0]);
-                if (u16[1]) {
-                    jprintf("\\u%04x", u16[1]);
+            int n;
+            if (ascii_only && (n = c8len(c)) > 1) {
+                char16_t c16[2];
+                c32toc16be(c8toc32(p), c16);
+                jprintf("\\u%04x", c16[0]);
+                if (c16[1]) {
+                    jprintf("\\u%04x", c16[1]);
                 }
                 p += n - 1;
                 continue;
@@ -75,18 +82,13 @@ static void print_json_string(struct jsonString *string) {
                 jprintf("\\t");
                 break;
             default:
+                if ((unsigned char) c <= 0x1F) {
+                    jprintf("%c", c);
+                }
                 jprintf("%c", c);
                 break;
             }
         } 
-    } else {
-        for (char c, *p = string->data; (c = *p); ++p) {
-            if (c == '\"' || c == '\\') {
-                jprintf("\\%c", c);
-            } else {
-                jprintf("%c", c);
-            }
-        }
     }
     jprintf("\"");
 }
@@ -184,6 +186,8 @@ extern size_t json_pretty_print(char *out, size_t size, struct jsonValue *value)
     print_json_value(value);
     if (size) {
         out[size - 1] = '\0';
+    } else {
+        ++position;
     }
     out_begin = NULL;
     return position;

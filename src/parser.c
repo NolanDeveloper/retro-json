@@ -19,11 +19,12 @@ thread_local const char *json_begin; //!< holds start of json string during json
 thread_local const char *json_it; 
 
 extern struct jsonValue *json_parse(const char *json) {
+    struct jsonValue *value = NULL;
     if (!json) {
         errorf("json == NULL");
         goto fail;
     }
-    struct jsonValue *value = json_malloc(sizeof(struct jsonValue));
+    value = json_malloc(sizeof(struct jsonValue));
     if (!value) {
         goto fail;
     }
@@ -44,28 +45,51 @@ static void skip_spaces(void) {
     }
 }
 
-static bool consume(const char *str) {
+static bool consume_optionally(const char *str) {
     size_t n = strlen(str);
     if (strncmp(str, json_it, n)) {
-        errorf("'%s' was expected", str);
         return false;
     }
     json_it += n;
     return true;
 }
 
-/*! Appends UTF-32 char to UTF-8 code unit sequence in jsonString. */
-static bool append_unicode_code_point(struct jsonString *string, char32_t c) {
-    if (c <= 0x007f) {
-        return json_string_append(string, (char) c);
-    } else if (0x0080 <= c && c <= 0x07ff) {
-        return json_string_append(string, (char) (0xc0 | c >> 6))
-            && json_string_append(string, (char) (0x80 | (c & 0x3f)));
-    } else {
-        return json_string_append(string, (char) (0xe0 | c >> 12))
-            && json_string_append(string, (char) (0x80 | ((c >> 6) & 0x3f)))
-            && json_string_append(string, (char) (0x80 | (c & 0x3f)));
+static bool consume(const char *str) {
+    bool result = consume_optionally(str);
+    if (!result) {
+        errorf("'%s' was expected", str);
     }
+    return result;
+}
+
+/*! Appends UTF-32 char to UTF-8 code unit sequence in jsonString. */
+static bool append_unicode_code_point(struct jsonString *string, char32_t c32) {
+    char c8[4];
+    int n = 0;
+    if (!c32toc8(c32, &n, c8)) {
+        errorf("Illegal UTF-8 sequence");
+        return false;
+    }
+    for (int i = 0; i < n; ++i) {
+        if (!json_string_append(string, (char) c8[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool parse_hex4(char32_t *out) {
+    char buf[5];
+    strncpy(buf, json_it, 4);
+    buf[4] = '\0';
+    char *end;
+    *out = strtoul(buf, &end, 16);
+    if (end != &buf[4]) {
+        errorf("Bad Unicode escape sequence");
+        return false;
+    }
+    json_it += 4;
+    return true;
 }
 
 static bool parse_string(struct jsonString *string) {
@@ -73,7 +97,7 @@ static bool parse_string(struct jsonString *string) {
     ++json_it;
     char *end_or_slash = strpbrk(json_it, "\"\\");
     if (!end_or_slash) {
-        errorf("Unterminated strin.");
+        errorf("Unterminated string");
         return false;
     }
     if (*end_or_slash == '\"') {
@@ -135,49 +159,25 @@ static bool parse_string(struct jsonString *string) {
                 ++json_it;
                 break;
             case 'u': {
-                char buf[5];
                 ++json_it;
-                for (uint8_t i = 0; i < sizeof(buf) - 1; ++i) {
-                    buf[i] = *json_it;
-                    ++json_it;
-                }
-                buf[sizeof(buf) - 1] = '\0';
-                char *end;
-                char32_t hex = strtoul(buf, &end, 16);
-                if (end != &buf[4]) {
-                    errorf("Bad Unicode escape sequence");
+                char32_t p = 0;
+                if (!parse_hex4(&p)) {
                     return false;
                 }
-                if (hex >> 11ul == 0x1B) { /* this is utf-16 surrogate pair either high or low */
-                    bool is_little_end = (hex >> 10ul) & 1ul;
-                    if (consume("\\u")) {
-                        errorf("Bad Unicode escape sequence");
+                enum c16Type type = c16type((char16_t) p);
+                const char *t = json_it;
+                if (type == UTF16_SURROGATE_HIGH && consume_optionally("\\u")) {
+                    char32_t next = 0;
+                    if (!parse_hex4(&next)) {
                         return false;
-                    }
-                    for (uint8_t i = 0; i < sizeof(buf) - 1; ++i) {
-                        buf[i] = *json_it;
-                        ++json_it;
-                    }
-                    buf[sizeof(buf) - 1] = '\0';
-                    uint32_t surrogate = strtoul(buf, &end, 16);
-                    if (end != &buf[4]) {
-                        errorf("Bad Unicode escape sequence");
-                        return false;
-                    }
-                    if (((surrogate >> 10ul) & 1ul) == is_little_end) {
-                        errorf("Bad Unicode escape sequence");
-                        return false;
-                    }
-                    hex       &= (1ul << 10ul) - 1ul;
-                    surrogate &= (1ul << 10ul) - 1ul;
-                    if (is_little_end) {
-                        hex |= surrogate << 10ul;
+                    } 
+                    if (c16type(next) != UTF16_SURROGATE_LOW) {
+                        json_it = t;
                     } else {
-                        hex = (hex << 10ul) | surrogate;
+                        p = c16pairtoc32(p, next);
                     }
-                    hex += 0x10000;
                 }
-                if (!append_unicode_code_point(string, hex)) {
+                if (!append_unicode_code_point(string, p)) {
                     return false;
                 }
                 break;
@@ -201,7 +201,7 @@ static bool parse_object(struct jsonObject *object) {
     assert('{' == *json_it);
     ++json_it;
     skip_spaces();
-    if ('}' == *json_it) {
+    if (consume_optionally("}")) {
         return true;
     }
     while (1) {
@@ -231,8 +231,7 @@ static bool parse_object(struct jsonObject *object) {
         key = NULL;
         value = NULL;
         skip_spaces();
-        if ('}' == *json_it) {
-            assert(consume("}"));
+        if (consume_optionally("}")) {
             return true;
         }
         if (!consume(",")) {
@@ -253,7 +252,7 @@ static bool parse_array(struct jsonArray *array) {
     assert('[' == *json_it);
     ++json_it;
     skip_spaces();
-    if (']' == *json_it) {
+    if (consume_optionally("]")) {
         return true;
     }
     while (1) {
@@ -269,8 +268,7 @@ static bool parse_array(struct jsonArray *array) {
         }
         value = NULL;
         skip_spaces();
-        if (']' == *json_it) {
-            assert(consume("]"));
+        if (consume_optionally("]")) {
             return true;
         }
         if (!consume(",")) {

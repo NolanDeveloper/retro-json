@@ -14,10 +14,10 @@ void dbg_print_blocks(void);
 
 #else
 
-#define json_malloc        json_malloc_
-#define json_calloc(size)  json_calloc_(size, 1)
-#define json_realloc       json_realloc_
-#define json_free          json_free_
+#define json_malloc  json_malloc_
+#define json_calloc  json_calloc_
+#define json_realloc json_realloc_
+#define json_free    json_free_
 
 #endif
 
@@ -46,9 +46,19 @@ struct jsonValue *json_object_at(struct jsonObject *object, const char *key);
 
 void json_value_free_internal(struct jsonValue *value);
 
-extern int u8len(char c);
-extern char32_t u8tou32(const char *u8);
-extern void u32tou16le(char32_t u32, char16_t out[2]);
+enum c16Type {
+    UTF16_NOT_SURROGATE,
+    UTF16_SURROGATE_HIGH,
+    UTF16_SURROGATE_LOW
+};
+
+extern int c16len(char16_t c16);
+extern enum c16Type c16type(char16_t c16);
+extern char32_t c16pairtoc32(char16_t high, char16_t low);
+extern int c8len(char c);
+extern bool c32toc8(char32_t c32, int *n, char *c8);
+extern char32_t c8toc32(const char *c8);
+extern void c32toc16be(char32_t c32, char16_t out[2]);
 
 extern const char *error_out_of_memory;
 

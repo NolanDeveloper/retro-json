@@ -32,13 +32,12 @@ extern bool json_string_init_str(struct jsonString *string, const char *str) {
     }
     strcpy(string->data, str);
     string->hash = json_string_hash(str);
-    return 1;
+    return true;
 }
 
 extern bool json_string_init_mem(struct jsonString *string, const char *mem, size_t n) {
     assert(string);
     assert(mem);
-    assert(n);
     string->size = string->capacity = n + 1;
     string->data = json_malloc(string->size);
     if (!string->data) {
@@ -47,7 +46,7 @@ extern bool json_string_init_mem(struct jsonString *string, const char *mem, siz
     memcpy(string->data, mem, n);
     string->data[n] = '\0';
     string->hash = json_string_hash(string->data);
-    return 1;
+    return true;
 }
 
 extern void json_string_free_internal(struct jsonString *string) {

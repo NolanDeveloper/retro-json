@@ -41,7 +41,7 @@ static bool json_array_ensure_has_free_space(struct jsonArray *array, size_t n) 
     do {
         new_capacity = new_capacity ? 2 *new_capacity : INITIAL_CAPACITY;
     } while (array->size + n > new_capacity);
-    struct jsonValue **new_values = json_realloc(array->values, new_capacity *sizeof(struct jsonValue *));
+    struct jsonValue **new_values = json_realloc(array->values, new_capacity * sizeof(struct jsonValue *));
     if (!new_values) {
         return false;
     }

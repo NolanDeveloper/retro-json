@@ -25,11 +25,12 @@ CPPFLAGS   += -I src
 BUILD_DIR  := $(shell mkdir -p "build-$(MODE)" ; echo build-$(MODE) ; )
 
 LIBRARY    := $(BUILD_DIR)/libretrojson.a
-APPS       := $(patsubst %, $(BUILD_DIR)/%/a.out, $(shell find * -name 'main.c' | sed -E 's/(.*)\/main.c/\1/g'))
-TEST_APPS  := $(filter $(BUILD_DIR)/test-%,$(APPS))
+PRETTIFY   := $(BUILD_DIR)/prettify/a.out
+TEST_APPS  := $(BUILD_DIR)/test-stress/a.out
+APPS       := $(PRETTIFY) $(TEST_APPS)
 
 .PHONY: all
-all: $(LIBRARY) $(APPS)
+all: $(LIBRARY) $(PRETTIFY)
 
 # file compilation rule
 

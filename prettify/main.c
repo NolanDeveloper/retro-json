@@ -14,12 +14,15 @@
 
 int main(int argc, char ** argv) {
     int result = EXIT_SUCCESS;
+    int file = -1;
+    char *memory = NULL;
+    struct jsonValue *value = NULL;
     if (argc != 2) {
         fprintf(stderr, "Usage: %s ./file.json\n", argv[0]);
         result = EXIT_FAILURE;
         goto finish;
     }
-    int file = open(argv[1], O_RDONLY);
+    file = open(argv[1], O_RDONLY);
     if (file < 0) {
         perror("open");
         result = EXIT_FAILURE;
@@ -31,12 +34,12 @@ int main(int argc, char ** argv) {
         result = EXIT_FAILURE;
         goto finish;
     };
-    char *memory = mmap(NULL, info.st_size, PROT_READ, MAP_SHARED, file, 0);
+    memory = mmap(NULL, info.st_size, PROT_READ, MAP_SHARED, file, 0);
     if (MAP_FAILED == memory) {
         result = EXIT_FAILURE;
         goto finish;
     }
-    struct jsonValue *value = json_parse(memory);
+    value = json_parse(memory);
     if (!value) {
         fprintf(stderr, "Failed to parse json: %s.\n", json_strerror());
         result = EXIT_FAILURE;
@@ -47,6 +50,7 @@ int main(int argc, char ** argv) {
     char *buffer = malloc(size);
     json_pretty_print(buffer, size, value);
     puts(buffer);
+    free(buffer);
 finish:
     fflush(stdout);
     json_value_free(value);

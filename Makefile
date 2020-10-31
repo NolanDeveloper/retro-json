@@ -67,8 +67,7 @@ tests: $(TEST_APPS)
 
 .PHONY: check
 check: tests 
-	./scripts/samples-memory-leak-check.sh
-	for i in $(TEST_APPS) ; do ./$$i ; done
+	@for i in $(TEST_APPS) ; do ./$$i test-compliance/JSONTestSuite ; done
 
 .PHONY: clean
 clean:

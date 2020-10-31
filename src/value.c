@@ -8,13 +8,17 @@
 #include "json_internal.h"
 
 extern void json_value_free(struct jsonValue *value) {
-    if (!value) return;
+    if (!value) {
+        return;
+    }
     json_value_free_internal(value);
     json_free(value);
 }
 
 extern void json_value_free_internal(struct jsonValue *value) {
-    if (!value) return;
+    if (!value) {
+        return;
+    }
     switch (value->kind) {
     case JVK_STR:  
         json_string_free_internal(&value->v.string); 

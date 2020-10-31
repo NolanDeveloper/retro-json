@@ -18,7 +18,7 @@ static thread_local size_t position;
 static thread_local unsigned indent;
 
 static thread_local const char *tab = "\t";
-static thread_local bool ascii_only = true;
+static thread_local bool ascii_only = false;
 
 static void print_json_value(struct jsonValue *value);
 

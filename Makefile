@@ -26,7 +26,10 @@ BUILD_DIR  := $(shell mkdir -p "build-$(MODE)" ; echo build-$(MODE) ; )
 
 LIBRARY    := $(BUILD_DIR)/libretrojson.a
 PRETTIFY   := $(BUILD_DIR)/prettify/a.out
-TEST_APPS  := $(BUILD_DIR)/test-stress/a.out
+TEST_STRESS     := $(BUILD_DIR)/test-stress/a.out
+TEST_UNIT       := $(BUILD_DIR)/test-unit/a.out
+TEST_COMPLIANCE := $(BUILD_DIR)/test-compliance/a.out
+TEST_APPS  := $(TEST_STRESS) $(TEST_UNIT) $(TEST_COMPLIANCE)
 APPS       := $(PRETTIFY) $(TEST_APPS)
 
 .PHONY: all
@@ -59,8 +62,11 @@ $(LIBRARY): $(patsubst %.c, $(BUILD_DIR)/%.o, $(CFILES))
 
 # other targets
 
+.PHONY: tests
+tests: $(TEST_APPS)
+
 .PHONY: check
-check: $(APPS)
+check: tests 
 	./scripts/samples-memory-leak-check.sh
 	for i in $(TEST_APPS) ; do ./$$i ; done
 

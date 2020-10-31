@@ -33,7 +33,7 @@ int main(int argc, char ** argv) {
         perror("fstat");
         result = EXIT_FAILURE;
         goto finish;
-    };
+    }
     memory = mmap(NULL, info.st_size, PROT_READ, MAP_SHARED, file, 0);
     if (MAP_FAILED == memory) {
         result = EXIT_FAILURE;

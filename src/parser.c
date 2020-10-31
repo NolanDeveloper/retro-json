@@ -18,6 +18,9 @@ static bool parse_value(struct jsonValue *value);
 thread_local const char *json_begin; //!< holds start of json string during json_parse recursive calls 
 thread_local const char *json_it; 
 
+static thread_local size_t depth;
+static thread_local size_t max_depth = 1000;
+
 extern struct jsonValue *json_parse(const char *json) {
     struct jsonValue *value = NULL;
     if (!json) {
@@ -93,7 +96,9 @@ static bool parse_hex4(char32_t *out) {
 }
 
 static bool parse_string(struct jsonString *string) {
-    assert('"' == *json_it);
+    if (!consume("\"")) {
+        return false;
+    }
     ++json_it;
     char *end_or_slash = strpbrk(json_it, "\"\\");
     if (!end_or_slash) {
@@ -255,16 +260,18 @@ static bool parse_array(struct jsonArray *array) {
     if (consume_optionally("]")) {
         return true;
     }
-    while (1) {
+    while (true) {
         value = json_malloc(sizeof(struct jsonValue));
         if (!value) {
-            goto fail;
+            return false;
         }
         if (!parse_value(value)) {
-            goto fail;
+            json_free(value);
+            return false;
         }
         if (!json_array_append(array, value)) {
-            goto fail;
+            json_value_free(value);
+            return false;
         }
         value = NULL;
         skip_spaces();
@@ -272,13 +279,10 @@ static bool parse_array(struct jsonArray *array) {
             return true;
         }
         if (!consume(",")) {
-            goto fail;
+            return false;
         }
     }
     assert(false);
-fail:
-    json_value_free(value);
-    return false;
 }
 
 static bool parse_value_object(struct jsonValue *value) {
@@ -339,20 +343,32 @@ static bool parse_value_number(struct jsonValue *value) {
 }
 
 static bool parse_value(struct jsonValue *value) {
+    ++depth;
+    if (depth > max_depth) {
+        --depth;
+        return false;
+    }
     skip_spaces();
+    bool result;
     switch (*json_it) {
     case '{':
-        return parse_value_object(value);
+        result = parse_value_object(value);
+        break;
     case '[':
-        return parse_value_array(value);
+        result = parse_value_array(value);
+        break;
     case 't':
-        return parse_value_true(value);
+        result = parse_value_true(value);
+        break;
     case 'f':
-        return parse_value_false(value);
+        result = parse_value_false(value);
+        break;
     case 'n':
-        return parse_value_null(value);
+        result = parse_value_null(value);
+        break;
     case '"':
-        return parse_value_string(value);
+        result = parse_value_string(value);
+        break;
     case '-':
     case '0':
     case '1':
@@ -364,10 +380,14 @@ static bool parse_value(struct jsonValue *value) {
     case '7':
     case '8':
     case '9':
-        return parse_value_number(value);
+        result = parse_value_number(value);
+        break;
     default:
         errorf("unknown symbol");
-        return false;
+        result = false;
+        break;
     }
+    --depth;
+    return result;
 }
 

@@ -48,25 +48,25 @@ extern int c8len(char c) {
 
 extern bool c32toc8(char32_t c32, int *n, char *c8) {
     if (c32 <= 0x007F) {
-        *c8 = c32;
+        c8[0] = c32;
         *n = 1;
         return true;
     } else if (c32 <= 0x07FF) {
-        *c8++ = (0xC0 | (c32 >> 6));
-        *c8   = (0x80 | (c32 & 0x3F));
+        c8[0] = 0xC0 | (c32 >> 6);
+        c8[1] = 0x80 | (c32 & 0x3F);
         *n = 2;
         return true;
     } else if (c32 <= 0xFFFF) {
-        *c8++ = (0xE0 | (c32 >> 12));
-        *c8++ = (0x80 | ((c32 >> 6) & 0x3F));
-        *c8   = (0x80 | (c32 & 0x3F));
+        c8[0] = 0xE0 | (c32 >> 12);
+        c8[1] = 0x80 | ((c32 >> 6) & 0x3F);
+        c8[2] = 0x80 | (c32 & 0x3F);
         *n = 3;
         return true;
     } else if (c32 <= 0x10FFFFull) {
-        *c8++ = (0xF0 | (c32 >> 18));
-        *c8++ = (0x80 | ((c32 >> 12) & 0x3F));
-        *c8++ = (0x80 | ((c32 >> 6) & 0x3F));
-        *c8   = (0x80 | (c32 & 0x3F));
+        c8[0] = 0xF0 | (c32 >> 18);
+        c8[1] = 0x80 | ((c32 >> 12) & 0x3F);
+        c8[2] = 0x80 | ((c32 >> 6) & 0x3F);
+        c8[3] = 0x80 | (c32 & 0x3F);
         *n = 4;
         return true;
     }

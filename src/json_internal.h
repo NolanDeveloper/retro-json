@@ -36,12 +36,16 @@ unsigned json_string_hash(const char *str);
 
 void json_array_init(struct jsonArray *array);
 void json_array_free_internal(struct jsonArray *array);
+bool json_array_reserve(struct jsonArray *array, size_t new_capacity);
+bool json_array_double(struct jsonArray *array, size_t min_capacity);
 bool json_array_append(struct jsonArray *array, struct jsonValue *value);
 size_t json_array_size(struct jsonArray *array);
 
 void json_object_init(struct jsonObject *object);
 void json_object_free_internal(struct jsonObject *object);
+bool json_object_reserve(struct jsonObject *object, size_t size);
 bool json_object_add(struct jsonObject *object, struct jsonString *key, struct jsonValue *value);
+struct jsonValue *json_object_next(struct jsonObject *object, const char *key, struct jsonValue *prev);
 struct jsonValue *json_object_at(struct jsonObject *object, const char *key);
 
 void json_value_free_internal(struct jsonValue *value);

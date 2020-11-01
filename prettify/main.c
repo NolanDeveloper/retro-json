@@ -22,6 +22,10 @@ int main(int argc, char ** argv) {
         result = EXIT_FAILURE;
         goto finish;
     }
+    if (!json_init()) {
+        fprintf(stderr, "json_init failed\n");
+        goto finish;
+    }
     file = open(argv[1], O_RDONLY);
     if (file < 0) {
         perror("open");
@@ -56,5 +60,6 @@ finish:
     json_value_free(value);
     munmap(memory, info.st_size);
     close(file);
+    json_exit();
     return result;
 }

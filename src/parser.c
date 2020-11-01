@@ -21,6 +21,14 @@ thread_local const char *json_it;
 static thread_local size_t depth;
 static thread_local size_t max_depth = 1000;
 
+extern bool json_init(void) {
+    return error_init();
+}
+
+extern void json_exit(void) {
+    error_exit();
+}
+
 extern struct jsonValue *json_parse(const char *json) {
     if (!json) {
         errorf("json == NULL");

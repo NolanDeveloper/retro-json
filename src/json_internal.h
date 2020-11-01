@@ -16,11 +16,11 @@ void dbg_print_blocks(void);
 
 #else
 
-#define json_malloc     json_malloc_
-#define json_calloc     json_calloc_
-#define json_realloc    json_realloc_
-#define json_free       json_free_
-#define json_mem_detach 
+#define json_malloc(size)        json_malloc_(size)
+#define json_calloc(size)        json_calloc_(size)
+#define json_realloc(ptr, size)  json_realloc_(ptr, size)
+#define json_free(ptr)           json_free_(ptr)
+#define json_mem_detach(ptr)  
 
 #endif
 
@@ -60,20 +60,19 @@ enum c16Type {
     UTF16_SURROGATE_LOW
 };
 
-extern int c16len(char16_t c16);
-extern enum c16Type c16type(char16_t c16);
-extern char32_t c16pairtoc32(char16_t high, char16_t low);
-extern int c8len(char c);
-extern bool c32toc8(char32_t c32, int *n, char *c8);
-extern char32_t c8toc32(const char *c8);
-extern void c32toc16be(char32_t c32, char16_t out[2]);
+int c16len(char16_t c16);
+enum c16Type c16type(char16_t c16);
+char32_t c16pairtoc32(char16_t high, char16_t low);
+int c8len(char c);
+bool c32toc8(char32_t c32, int *n, char *c8);
+char32_t c8toc32(const char *c8);
+void c32toc16be(char32_t c32, char16_t out[2]);
 
-extern const char *error_out_of_memory;
-
-extern thread_local const char *error;
-
+bool error_init(void);
+void error_exit(void);
 void set_error(const char *e);
 
+extern const char *error_out_of_memory;
 extern thread_local const char *json_begin; //!< holds start of json string during json_parse recursive calls 
 extern thread_local const char *json_it; 
 

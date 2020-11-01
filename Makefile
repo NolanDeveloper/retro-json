@@ -19,12 +19,16 @@ CFLAGS     += -Wall
 CFLAGS     += -Wextra
 CFLAGS     += -Werror
 CFLAGS     += -Wstrict-prototypes
+CFLAGS     += -fPIC
+
+LDLIBS     += -lpthread
 
 CPPFLAGS   += -I src
 
 BUILD_DIR  := $(shell mkdir -p "build-$(MODE)" ; echo build-$(MODE) ; )
 
-LIBRARY    := $(BUILD_DIR)/libretrojson.a
+LIBRARY_A  := $(BUILD_DIR)/libretrojson.a
+LIBRARY_SO := $(BUILD_DIR)/libretrojson.so
 PRETTIFY   := $(BUILD_DIR)/prettify/a.out
 TEST_STRESS     := $(BUILD_DIR)/test-stress/a.out
 TEST_UNIT       := $(BUILD_DIR)/test-unit/a.out
@@ -33,7 +37,7 @@ TEST_APPS  := $(TEST_STRESS) $(TEST_UNIT) $(TEST_COMPLIANCE)
 APPS       := $(PRETTIFY) $(TEST_APPS)
 
 .PHONY: all
-all: $(LIBRARY) $(PRETTIFY)
+all: $(LIBRARY_A) $(LIBRARY_SO) $(PRETTIFY)
 
 # file compilation rule
 
@@ -47,9 +51,9 @@ $(patsubst %.c, $(BUILD_DIR)/%.o, $(CFILES)): $(BUILD_DIR)/%.o: %.c
 # applications are all directories with main.c
 
 .SECONDEXPANSION:
-$(APPS): $(BUILD_DIR)/%/a.out: $$(shell find % -name '*.c' | sed -E 's:(.*)\.c:$(BUILD_DIR)/\1.o:g') $(LIBRARY) 
+$(APPS): $(BUILD_DIR)/%/a.out: $$(shell find % -name '*.c' | sed -E 's:(.*)\.c:$(BUILD_DIR)/\1.o:g') $(LIBRARY_A) 
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $^ -o $@ 
+	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
 
 # libretrojson.a
 
@@ -57,8 +61,13 @@ CFILES     := $(shell find src -name '*.c')
 ifeq "$(MODE)" "release"
 	CFILES := $(filter-out dbg_%, $(CFILES))
 endif
-$(LIBRARY): $(patsubst %.c, $(BUILD_DIR)/%.o, $(CFILES))
+$(LIBRARY_A): $(patsubst %.c, $(BUILD_DIR)/%.o, $(CFILES))
+	@mkdir -p $(dir $@)
 	$(AR) -rcs $@ $^
+
+$(LIBRARY_SO): $(patsubst %.c, $(BUILD_DIR)/%.o, $(CFILES))
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $^ -shared -o $@ $(LDLIBS)
 
 # other targets
 

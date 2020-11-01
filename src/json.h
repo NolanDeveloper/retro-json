@@ -43,6 +43,9 @@ struct jsonValue {
     } v;
 };
 
+bool json_init(void);
+void json_exit(void);
+
 struct jsonValue * json_value_create_number(double number);
 struct jsonValue * json_value_create_string(const char * string);
 struct jsonValue * json_value_create_object(void);

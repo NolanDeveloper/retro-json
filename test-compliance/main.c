@@ -44,6 +44,10 @@ int main(int argc, char *argv[]) {
         printf("Usage:\n\t%s y_test1.json n_test2.json i_test3.json\n", argv[0]);
         return EXIT_FAILURE;
     }
+    if (!json_init()) {
+        printf("json_init failed\n");
+        return EXIT_FAILURE;
+    }
     for (int i = 1; argv[i]; ++i) {
         char *filename = argv[i];
         char type = basename(filename)[0];
@@ -89,5 +93,6 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
     }
+    json_exit();
     return EXIT_SUCCESS;
 }

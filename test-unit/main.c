@@ -1,5 +1,6 @@
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include <json.h>
 
@@ -25,6 +26,10 @@ static struct {
 int main(int argc, char *argv[]) {
     (void) argc;
     (void) argv;
+    if (!json_init()) {
+        fprintf(stderr, "json_init failed\n");
+        return EXIT_FAILURE;
+    }
     for (size_t i = 0; i < sizeof(tests) / sizeof(*tests); ++i) {
         bool ok = tests[i].run();
         if (ok) {
@@ -33,4 +38,6 @@ int main(int argc, char *argv[]) {
             printf(RED "%s UNIT TEST FAILED\n" RESET, tests[i].name);
         }
     }
+    json_exit();
+    return EXIT_SUCCESS;
 }

@@ -1,4 +1,5 @@
 #include <stdarg.h>
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <threads.h>
@@ -9,19 +10,36 @@
 
 const char *error_out_of_memory = "out of memory";
 
-thread_local const char *error;
+static tss_t error_key;
+
+static void free_error(void *error) {
+    if (!error || error == error_out_of_memory) {
+        return;
+    }
+    json_free(error);
+}
+
+extern bool error_init(void) {
+    return thrd_success == tss_create(&error_key, free_error);
+}
+
+extern void error_exit(void) {
+    char *error = tss_get(error_key);
+    free_error(error);
+    tss_delete(error_key);
+}
 
 extern const char *json_strerror(void) {
+    char *error = tss_get(error_key);
     return error ? error : "NULL";
 }
 
 extern void set_error(const char *e) {
-    if (error && error != error_out_of_memory) {
-        json_free((char *) error);
-    }
-    error = e;
-    if (error != error_out_of_memory) {
-        json_mem_detach((char *) error);
+    char *error = tss_get(error_key);
+    free_error(error);
+    tss_set(error_key, (char *) e);
+    if (e && e != error_out_of_memory) {
+        json_mem_detach((char *) e);
     }
 }
 
@@ -71,10 +89,9 @@ extern void errorf(const char *fmt, ...) {
     va_end(args);
     if (!message) {
         set_error(NULL);
-        error = NULL;
         return;
     }
-    set_error(asprintf("[%u:%u] %s", line, column, message));
+    set_error(asprintf("at %u:%u %s", line, column, message));
     json_free(message);
 }
 

@@ -21,6 +21,8 @@ size_t block_index;
 static void remove_block(struct Block *block) {
     if (block == blocks_first) {
         blocks_first = blocks_first->next;
+    } else if (!block->prev && !block->next) {
+        return;
     }
     if (block->prev) {
         block->prev->next = block->next;
@@ -100,6 +102,16 @@ extern void dbg_free(void *ptr, const char *file, int line) {
     ptr = (char *) ptr - offsetof(struct Block, memory);
     remove_block(ptr);
     free(ptr);
+}
+
+extern void dbg_mem_detach(void *ptr, const char *file, int line) {
+    if (!ptr) {
+        return;
+    }
+    (void) file;
+    (void) line;
+    ptr = (char *) ptr - offsetof(struct Block, memory);
+    remove_block(ptr);
 }
 
 extern void dbg_print_blocks(void) {

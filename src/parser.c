@@ -13,7 +13,7 @@
 #include "json.h"
 #include "json_internal.h"
 
-static bool parse_value(struct jsonValue *value);
+static struct jsonValue *parse_value(void);
 
 thread_local const char *json_begin; //!< holds start of json string during json_parse recursive calls 
 thread_local const char *json_it; 
@@ -22,24 +22,14 @@ static thread_local size_t depth;
 static thread_local size_t max_depth = 1000;
 
 extern struct jsonValue *json_parse(const char *json) {
-    struct jsonValue *value = NULL;
     if (!json) {
         errorf("json == NULL");
-        goto fail;
-    }
-    value = json_malloc(sizeof(struct jsonValue));
-    if (!value) {
-        goto fail;
+        return NULL;
     }
     json_begin = json_it = json;
-    if (!parse_value(value)) {
-        goto fail;
-    }
+    struct jsonValue *value = parse_value();
     json_begin = json_it = NULL;
     return value;
-fail:
-    json_free(value);
-    return NULL;
 }
 
 static void skip_spaces(void) {
@@ -70,7 +60,7 @@ static bool append_unicode_code_point(struct jsonString *string, char32_t c32) {
     char c8[4];
     int n = 0;
     if (!c32toc8(c32, &n, c8)) {
-        errorf("Illegal UTF-8 sequence");
+        errorf("illegal UTF-8 sequence");
         return false;
     }
     for (int i = 0; i < n; ++i) {
@@ -88,7 +78,7 @@ static bool parse_hex4(char32_t *out) {
     char *end;
     *out = strtoul(buf, &end, 16);
     if (end != &buf[4]) {
-        errorf("Bad Unicode escape sequence");
+        errorf("bad Unicode escape sequence");
         return false;
     }
     json_it += 4;
@@ -101,7 +91,7 @@ static bool parse_string(struct jsonString *string) {
     }
     char *end_or_slash = strpbrk(json_it, "\"\\");
     if (!end_or_slash) {
-        errorf("Unterminated string");
+        errorf("unterminated string");
         return false;
     }
     if (*end_or_slash == '\"') {
@@ -187,7 +177,7 @@ static bool parse_string(struct jsonString *string) {
                 break;
             }
             default:
-                errorf("Unknown escape sequence");
+                errorf("unknown escape sequence");
                 return false;
             }
             break;
@@ -209,11 +199,10 @@ static bool parse_object(struct jsonObject *object) {
         return true;
     }
     while (1) {
-        key = json_malloc(sizeof(struct jsonString));
+        key = json_string_create();
         if (!key) {
             goto fail;
         }
-        json_string_init(key);
         skip_spaces();
         if (!parse_string(key)) {
             goto fail;
@@ -222,11 +211,8 @@ static bool parse_object(struct jsonObject *object) {
         if (!consume(":")) {
             goto fail;
         }
-        value = json_malloc(sizeof(struct jsonValue));
+        value = parse_value();
         if (!value) {
-            goto fail;
-        }
-        if (!parse_value(value)) {
             goto fail;
         }
         if (!json_object_add(object, key, value)) {
@@ -260,17 +246,12 @@ static bool parse_array(struct jsonArray *array) {
         return true;
     }
     while (true) {
-        value = json_malloc(sizeof(struct jsonValue));
+        value = parse_value();
         if (!value) {
-            return false;
-        }
-        if (!parse_value(value)) {
-            json_free(value);
-            return false;
+            goto fail;
         }
         if (!json_array_append(array, value)) {
-            json_value_free(value);
-            return false;
+            goto fail;
         }
         value = NULL;
         skip_spaces();
@@ -278,10 +259,14 @@ static bool parse_array(struct jsonArray *array) {
             return true;
         }
         if (!consume(",")) {
-            return false;
+            goto fail;
         }
     }
     assert(false);
+fail:
+    json_value_free(value);
+    json_array_free_internal(array);
+    return false;
 }
 
 static bool parse_value_object(struct jsonValue *value) {
@@ -325,7 +310,11 @@ static bool parse_value_null(struct jsonValue *value) {
 static bool parse_value_string(struct jsonValue *value) {
     json_string_init(&value->v.string);
     value->kind = JVK_STR;
-    return parse_string(&value->v.string);
+    bool result = parse_string(&value->v.string);
+    if (!result) {
+        json_string_free_internal(&value->v.string);
+    }
+    return result;
 }
 
 static bool parse_value_number(struct jsonValue *value) {
@@ -341,11 +330,15 @@ static bool parse_value_number(struct jsonValue *value) {
     return true;
 }
 
-static bool parse_value(struct jsonValue *value) {
+static struct jsonValue *parse_value(void) {
     ++depth;
     if (depth > max_depth) {
         --depth;
-        return false;
+        return NULL;
+    }
+    struct jsonValue *value = json_malloc(sizeof(struct jsonValue));
+    if (!value) {
+        return NULL;
     }
     skip_spaces();
     bool result;
@@ -382,11 +375,15 @@ static bool parse_value(struct jsonValue *value) {
         result = parse_value_number(value);
         break;
     default:
-        errorf("unknown symbol");
+        errorf("json value was expected");
         result = false;
         break;
     }
     --depth;
-    return result;
+    if (!result) {
+        json_free(value);
+        value = NULL;
+    }
+    return value;
 }
 

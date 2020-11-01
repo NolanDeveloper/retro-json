@@ -4,43 +4,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <threads.h>
+#include <uchar.h>
 
-#include <dirent.h> 
+#include <libgen.h>
 
 #include <json.h>
+#include <json_internal.h>
 
 #define RED    "\x1b[31m"
 #define GREEN  "\x1b[32m"
 #define BLUE   "\x1b[34m"
 #define RESET  "\x1b[0m"
-
-static char *vasprintf(const char *fmt, va_list args) {
-    va_list args_copy;
-    va_copy(args_copy, args);
-    int n = vsnprintf(NULL, 0, fmt, args_copy);
-    va_end(args_copy);
-    if (n < 0) {
-        return NULL;
-    }
-    char *text = malloc(n + 1);
-    if (!text) {
-        return NULL;
-    }
-    n = vsnprintf(text, n + 1, fmt, args);
-    if (n < 0) {
-        free(text);
-        return NULL;
-    }
-    return text;
-}
-
-static char *asprintf(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    char *result = vasprintf(fmt, args);
-    va_end(args);
-    return result;
-}
 
 static const char *read_file(const char *filename) {
     char *buffer = NULL;
@@ -64,51 +39,20 @@ static const char *read_file(const char *filename) {
     return buffer;
 }
 
-static const char *extension(const char *filename) {
-    const char *ext = filename;
-    while (true) {
-        const char *next = strchr(ext, '.');
-        if (!next) {
-            break;
-        }
-        ext = next + 1;
-    }
-    return ext == filename ? "" : ext;
-}
-
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        printf("Usage:\n\ttest path/to/JSONTestSuite\n");
+    if (argc < 2) {
+        printf("Usage:\n\t%s y_test1.json n_test2.json i_test3.json\n", argv[0]);
         return EXIT_FAILURE;
     }
-    DIR *d = opendir(argv[1]);
-    if (!d) {
-        perror("opendir");
-        return EXIT_FAILURE;
-    }
-    struct dirent *file;
-    while ((file = readdir(d))) {
-        if (!strcmp(file->d_name, ".")) {
-            continue;
-        }
-        if (!strcmp(file->d_name, "..")) {
-            continue;
-        }
-        const char *filename = asprintf("%s/%s", argv[1], file->d_name);
-        if (strcmp(extension(file->d_name), "json")) {
-            printf("skip unknown file: %s\n", filename);
-            free((char *) filename);
-            continue;
-        }
-        char type = file->d_name[0];
+    for (int i = 1; argv[i]; ++i) {
+        char *filename = argv[i];
+        char type = basename(filename)[0];
         if (!strchr("yni", type)) {
-            printf("skip unknown file: %s\n", filename);
-            free((char *) filename);
+            printf("file name doesn't start with 'y', 'n', or 'i': %s\n", filename);
             continue;
         }
         const char *json_str = read_file(filename);
         if (!json_str) {
-            free((char *) filename);
             continue;
         }
         struct jsonValue *json = json_parse(json_str);
@@ -117,21 +61,21 @@ int main(int argc, char *argv[]) {
             if (json) {
                 printf(GREEN "TEST PASSED" RESET " '%s'\n", filename);
             } else {
-                printf(RED "FAILED TO PARSE" RESET " '%s'\n", filename);
+                printf(RED "FAILED TO PARSE" RESET " '%s' (%s)\n", filename, json_strerror());
             }
             break;
         case 'n':
             if (json) {
                 printf(RED "PARSER DIDN'T FAIL" RESET " '%s'\n", filename);
             } else {
-                printf(GREEN "TEST PASSED" RESET " '%s'\n", filename);
+                printf(GREEN "TEST PASSED" RESET " '%s' (%s)\n", filename, json_strerror());
             }
             break;
         case 'i':
             if (json) {
                 printf(BLUE "TEST PASSED" RESET " " GREEN "+" RESET " '%s'\n", filename);
             } else {
-                printf(BLUE "TEST PASSED" RESET " " RED "-" RESET " '%s'\n", filename);
+                printf(BLUE "TEST PASSED" RESET " " RED "-" RESET " '%s' (%s)\n", filename, json_strerror());
             }
             break;
         }
@@ -139,8 +83,11 @@ int main(int argc, char *argv[]) {
             json_value_free(json);
         }
         free((char *) json_str);
-        free((char *) filename);
+        if (!dbg_is_memory_clear()) {
+            printf(RED "MEMORY LEAK" RESET " '%s'\n", filename);
+            dbg_print_blocks();
+            exit(EXIT_FAILURE);
+        }
     }
-    closedir(d);
     return EXIT_SUCCESS;
 }

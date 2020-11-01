@@ -67,7 +67,9 @@ tests: $(TEST_APPS)
 
 .PHONY: check
 check: tests 
-	@for i in $(TEST_APPS) ; do ./$$i test-compliance/JSONTestSuite ; done
+	$(TEST_STRESS)
+	$(TEST_UNIT)
+	$(TEST_COMPLIANCE) ./test-compliance/JSONTestSuite/*
 
 .PHONY: clean
 clean:

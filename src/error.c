@@ -20,6 +20,9 @@ extern void set_error(const char *e) {
         json_free((char *) error);
     }
     error = e;
+    if (error != error_out_of_memory) {
+        json_mem_detach((char *) error);
+    }
 }
 
 static char *vasprintf(const char *fmt, va_list args) {
@@ -34,9 +37,7 @@ static char *vasprintf(const char *fmt, va_list args) {
     if (!text) {
         return NULL;
     }
-    va_copy(args_copy, args);
-    n = snprintf(text, n + 1, fmt, args);
-    va_end(args_copy);
+    n = vsnprintf(text, n + 1, fmt, args);
     if (n < 0) {
         json_free(text);
         return NULL;
@@ -53,7 +54,7 @@ static char *asprintf(const char *fmt, ...) {
 }
 
 extern void errorf(const char *fmt, ...) {
-    unsigned line = 0;
+    unsigned line = 1;
     unsigned column = 0;
     const char *p = json_begin;
     while (*p && p != json_it) {

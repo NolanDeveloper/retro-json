@@ -4,6 +4,7 @@ void *dbg_malloc(size_t size, const char *file, int line);
 void *dbg_calloc(size_t size, const char *file, int line);
 void *dbg_realloc(void *ptr, size_t size, const char *file, int line);
 void dbg_free(void *ptr, const char *file, int line);
+void dbg_mem_detach(void *ptr, const char *file, int line);
 bool dbg_is_memory_clear(void);
 void dbg_print_blocks(void);
 
@@ -11,13 +12,15 @@ void dbg_print_blocks(void);
 #define json_calloc(size)        dbg_calloc(size, __FILE__, __LINE__)
 #define json_realloc(ptr, size)  dbg_realloc(ptr, size, __FILE__, __LINE__)
 #define json_free(ptr)           dbg_free(ptr, __FILE__, __LINE__)
+#define json_mem_detach(ptr)     dbg_mem_detach(ptr, __FILE__, __LINE__)
 
 #else
 
-#define json_malloc  json_malloc_
-#define json_calloc  json_calloc_
-#define json_realloc json_realloc_
-#define json_free    json_free_
+#define json_malloc     json_malloc_
+#define json_calloc     json_calloc_
+#define json_realloc    json_realloc_
+#define json_free       json_free_
+#define json_mem_detach 
 
 #endif
 
@@ -26,6 +29,7 @@ void *json_calloc_(size_t size);
 void *json_realloc_(void *ptr, size_t size);
 void json_free_(void *ptr);
 
+struct jsonString *json_string_create(void);
 void json_string_init(struct jsonString *string);
 bool json_string_init_str(struct jsonString *string, const char *str);
 bool json_string_init_mem(struct jsonString *string, const char *mem, size_t n);

@@ -14,6 +14,14 @@
 #define FNV_OFFSET_BASIS    2166136261u
 #define FNV_PRIME           16777619u
 
+extern struct jsonString *json_string_create(void) {
+    struct jsonString *string = json_malloc(sizeof(struct jsonString));
+    if (string) {
+        json_string_init(string);
+    }
+    return string;
+}
+
 extern void json_string_init(struct jsonString *string) {
     assert(string);
     string->capacity = 0;

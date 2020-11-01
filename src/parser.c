@@ -99,7 +99,6 @@ static bool parse_string(struct jsonString *string) {
     if (!consume("\"")) {
         return false;
     }
-    ++json_it;
     char *end_or_slash = strpbrk(json_it, "\"\\");
     if (!end_or_slash) {
         errorf("Unterminated string");

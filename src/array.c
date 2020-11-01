@@ -10,17 +10,17 @@
 
 #define INITIAL_CAPACITY 6
 
-extern size_t json_array_size(struct jsonArray *array) {
+extern size_t array_size(struct jsonArray *array) {
     return array->size;
 }
 
-extern void json_array_init(struct jsonArray *array) {
+extern void array_init(struct jsonArray *array) {
     array->capacity = 0;
     array->size = 0;
     array->values = NULL;
 }
 
-extern void json_array_free_internal(struct jsonArray *array) {
+extern void array_free_internal(struct jsonArray *array) {
     if (!array) {
         return;
     }
@@ -34,7 +34,7 @@ extern void json_array_free_internal(struct jsonArray *array) {
 }
 
 /* Makes this true: new array->capacity = max(old array->capacity, new_capacity)  */
-extern bool json_array_reserve(struct jsonArray *array, size_t new_capacity) {
+extern bool array_reserve(struct jsonArray *array, size_t new_capacity) {
     assert(array);
     if (new_capacity <= array->capacity) {
         return true;
@@ -50,7 +50,7 @@ extern bool json_array_reserve(struct jsonArray *array, size_t new_capacity) {
 
 /* Increase array capacity by doubling (possibly 0 times) until it's greater
  * than new_size. */
-extern bool json_array_double(struct jsonArray *array, size_t min_capacity) {
+extern bool array_double(struct jsonArray *array, size_t min_capacity) {
     assert(array);
     if (min_capacity <= array->capacity) {
         return true;
@@ -59,22 +59,22 @@ extern bool json_array_double(struct jsonArray *array, size_t min_capacity) {
     while (new_capacity < min_capacity) {
         new_capacity *= 2;
     }
-    return json_array_reserve(array, new_capacity);
+    return array_reserve(array, new_capacity);
 }
 
-extern bool json_array_append(struct jsonArray *array, struct jsonValue *value) {
+extern bool array_append(struct jsonArray *array, struct jsonValue *value) {
     assert(array);
-    if (!json_array_double(array, array->size + 1)) {
+    if (!array_double(array, array->size + 1)) {
         return false;
     }
     array->values[array->size++] = value;
     return true;
 }
 
-extern size_t json_value_array_size(struct jsonValue *array) {
+extern size_t json_array_size(struct jsonValue *array) {
     return array ? array->v.array.size : 0;
 }
 
-extern struct jsonValue *json_value_array_at(struct jsonValue *array, size_t index) {
+extern struct jsonValue *json_array_at(struct jsonValue *array, size_t index) {
     return (array && index < array->v.array.size) ? array->v.array.values[index] : NULL;
 }

@@ -1,21 +1,14 @@
 #include <assert.h>
 #include <ctype.h>
-#include <inttypes.h>
 #include <math.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <threads.h>
-#include <uchar.h>
 
 #include "json.h"
 #include "json_internal.h"
 
 static struct jsonValue *parse_value(void);
 
-thread_local const char *json_begin; //!< holds start of json string during json_parse recursive calls 
+thread_local const char *json_begin;
 thread_local const char *json_it; 
 
 static thread_local size_t depth;
@@ -34,6 +27,7 @@ extern struct jsonValue *json_parse(const char *json) {
         errorf("json == NULL");
         return NULL;
     }
+    depth = 0;
     json_begin = json_it = json;
     struct jsonValue *value = parse_value();
     json_begin = json_it = NULL;
@@ -72,7 +66,7 @@ static bool append_unicode_code_point(struct jsonString *string, char32_t c32) {
         return false;
     }
     for (int i = 0; i < n; ++i) {
-        if (!json_string_append(string, (char) c8[i])) {
+        if (!string_append(string, (char) c8[i])) {
             return false;
         }
     }
@@ -104,17 +98,17 @@ static bool parse_string(struct jsonString *string) {
     }
     if (*end_or_slash == '\"') {
         size_t n = end_or_slash - json_it;
-        json_string_init_mem(string, json_it, n);
+        string_init_mem(string, json_it, n);
         json_it = end_or_slash + 1;
         return true;
     }
     while (1) {
         switch (*json_it) {
         case '"':
-            if (!json_string_append(string, '\0')) {
+            if (!string_append(string, '\0')) {
                 return false;
             }
-            if (!json_string_shrink(string)) {
+            if (!string_shrink(string)) {
                 return false;
             }
             ++json_it;
@@ -125,37 +119,37 @@ static bool parse_string(struct jsonString *string) {
             case '\\': 
             case '"': 
             case '/': 
-                if (!json_string_append(string, *json_it)) {
+                if (!string_append(string, *json_it)) {
                     return false;
                 }
                 ++json_it;
                 break;
             case 'b': 
-                if (!json_string_append(string, '\b')) {
+                if (!string_append(string, '\b')) {
                     return false;
                 }
                 ++json_it;
                 break;
             case 'f': 
-                if (!json_string_append(string, '\f')) {
+                if (!string_append(string, '\f')) {
                     return false;
                 }
                 ++json_it;
                 break;
             case 'n': 
-                if (!json_string_append(string, '\n')) {
+                if (!string_append(string, '\n')) {
                     return false;
                 }
                 ++json_it;
                 break;
             case 'r':
-                if (!json_string_append(string, '\r')) {
+                if (!string_append(string, '\r')) {
                     return false;
                 }
                 ++json_it;
                 break;
             case 't':
-                if (!json_string_append(string, '\t')) {
+                if (!string_append(string, '\t')) {
                     return false;
                 }
                 ++json_it;
@@ -190,7 +184,7 @@ static bool parse_string(struct jsonString *string) {
             }
             break;
         default: 
-            json_string_append(string, *json_it);
+            string_append(string, *json_it);
             ++json_it;
             break;
         }
@@ -207,7 +201,7 @@ static bool parse_object(struct jsonObject *object) {
         return true;
     }
     while (1) {
-        key = json_string_create();
+        key = string_create();
         if (!key) {
             goto fail;
         }
@@ -223,7 +217,7 @@ static bool parse_object(struct jsonObject *object) {
         if (!value) {
             goto fail;
         }
-        if (!json_object_add(object, key, value)) {
+        if (!object_add(object, key, value)) {
             goto fail;
         }
         key = NULL;
@@ -238,10 +232,10 @@ static bool parse_object(struct jsonObject *object) {
     }
     assert(false);
 fail:
-    json_string_free_internal(key);
+    string_free_internal(key);
     json_free(key);
     json_value_free(value);
-    json_object_free_internal(object);
+    object_free_internal(object);
     return false;
 }
 
@@ -258,7 +252,7 @@ static bool parse_array(struct jsonArray *array) {
         if (!value) {
             goto fail;
         }
-        if (!json_array_append(array, value)) {
+        if (!array_append(array, value)) {
             goto fail;
         }
         value = NULL;
@@ -273,19 +267,19 @@ static bool parse_array(struct jsonArray *array) {
     assert(false);
 fail:
     json_value_free(value);
-    json_array_free_internal(array);
+    array_free_internal(array);
     return false;
 }
 
 static bool parse_value_object(struct jsonValue *value) {
     value->kind = JVK_OBJ;
-    json_object_init(&value->v.object);
+    object_init(&value->v.object);
     return parse_object(&value->v.object);
 }
 
 static bool parse_value_array(struct jsonValue *value) {
     value->kind = JVK_ARR;
-    json_array_init(&value->v.array);
+    array_init(&value->v.array);
     return parse_array(&value->v.array);
 }
 
@@ -316,11 +310,11 @@ static bool parse_value_null(struct jsonValue *value) {
 }
 
 static bool parse_value_string(struct jsonValue *value) {
-    json_string_init(&value->v.string);
+    string_init(&value->v.string);
     value->kind = JVK_STR;
     bool result = parse_string(&value->v.string);
     if (!result) {
-        json_string_free_internal(&value->v.string);
+        string_free_internal(&value->v.string);
     }
     return result;
 }
@@ -341,7 +335,7 @@ static bool parse_value_number(struct jsonValue *value) {
 static struct jsonValue *parse_value(void) {
     ++depth;
     if (depth > max_depth) {
-        --depth;
+        errorf("recursion depth exceeded");
         return NULL;
     }
     struct jsonValue *value = json_malloc(sizeof(struct jsonValue));

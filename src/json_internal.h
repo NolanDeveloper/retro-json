@@ -1,3 +1,11 @@
+#ifndef JSON_INTERNAL_H
+#define JSON_INTERNAL_H
+
+#include "json.h"
+
+#include <threads.h>
+#include <uchar.h>
+
 #ifndef NDEBUG
 
 void *dbg_malloc(size_t size, const char *file, int line);
@@ -24,35 +32,79 @@ void dbg_print_blocks(void);
 
 #endif
 
+struct jsonString {
+    size_t capacity;
+    size_t size;
+    char *data;
+    unsigned hash;
+};
+
+struct jsonArray {
+    size_t capacity;
+    size_t size;
+    struct jsonValue **values;
+};
+
+struct jsonObjectEntry;
+struct jsonValue;
+
+struct jsonObject {
+    size_t capacity;
+    size_t size;  //!< Number of elements in entries i.e. excluding duplicate elements
+    struct jsonObjectEntry *entries;
+    struct jsonObjectEntry *first;
+    struct jsonObjectEntry *last;
+};
+
+struct jsonObjectEntry {
+    struct jsonString *key;
+    struct jsonValue *value;
+    struct jsonObjectEntry *next;
+    struct jsonObjectEntry *prev;
+};
+
+enum jsonValueKind { JVK_STR, JVK_NUM, JVK_OBJ, JVK_ARR, JVK_BOOL, JVK_NULL };
+
+struct jsonValue {
+    enum jsonValueKind kind;
+    union {
+        double number;
+        struct jsonString string;
+        struct jsonObject object;
+        struct jsonArray array;
+        bool boolean;
+    } v;
+};
+
 void *json_malloc_(size_t size);
 void *json_calloc_(size_t size);
 void *json_realloc_(void *ptr, size_t size);
 void json_free_(void *ptr);
 
-struct jsonString *json_string_create(void);
-void json_string_init(struct jsonString *string);
-bool json_string_init_str(struct jsonString *string, const char *str);
-bool json_string_init_mem(struct jsonString *string, const char *mem, size_t n);
-void json_string_free_internal(struct jsonString *string);
-bool json_string_append(struct jsonString *string, char c);
-bool json_string_shrink(struct jsonString *string);
-unsigned json_string_hash(const char *str);
+struct jsonString *string_create(void);
+void string_init(struct jsonString *string);
+bool string_init_str(struct jsonString *string, const char *str);
+bool string_init_mem(struct jsonString *string, const char *mem, size_t n);
+void string_free_internal(struct jsonString *string);
+bool string_append(struct jsonString *string, char c);
+bool string_shrink(struct jsonString *string);
+unsigned string_hash(const char *str);
 
-void json_array_init(struct jsonArray *array);
-void json_array_free_internal(struct jsonArray *array);
-bool json_array_reserve(struct jsonArray *array, size_t new_capacity);
-bool json_array_double(struct jsonArray *array, size_t min_capacity);
-bool json_array_append(struct jsonArray *array, struct jsonValue *value);
-size_t json_array_size(struct jsonArray *array);
+void array_init(struct jsonArray *array);
+void array_free_internal(struct jsonArray *array);
+bool array_reserve(struct jsonArray *array, size_t new_capacity);
+bool array_double(struct jsonArray *array, size_t min_capacity);
+bool array_append(struct jsonArray *array, struct jsonValue *value);
+size_t array_size(struct jsonArray *array);
 
-void json_object_init(struct jsonObject *object);
-void json_object_free_internal(struct jsonObject *object);
-bool json_object_reserve(struct jsonObject *object, size_t size);
-bool json_object_add(struct jsonObject *object, struct jsonString *key, struct jsonValue *value);
-struct jsonValue *json_object_next(struct jsonObject *object, const char *key, struct jsonValue *prev);
-struct jsonValue *json_object_at(struct jsonObject *object, const char *key);
+void object_init(struct jsonObject *object);
+void object_free_internal(struct jsonObject *object);
+bool object_reserve(struct jsonObject *object, size_t size);
+bool object_add(struct jsonObject *object, struct jsonString *key, struct jsonValue *value);
+struct jsonValue *object_next(struct jsonObject *object, const char *key, struct jsonValue *prev);
+struct jsonValue *object_at(struct jsonObject *object, const char *key);
 
-void json_value_free_internal(struct jsonValue *value);
+void value_free_internal(struct jsonValue *value);
 
 enum c16Type {
     UTF16_NOT_SURROGATE,
@@ -76,5 +128,6 @@ extern const char *error_out_of_memory;
 extern thread_local const char *json_begin; //!< holds start of json string during json_parse recursive calls 
 extern thread_local const char *json_it; 
 
-extern void errorf(const char *fmt, ...);
+void errorf(const char *fmt, ...);
 
+#endif

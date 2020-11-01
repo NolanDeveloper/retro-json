@@ -31,7 +31,7 @@ static const size_t prime_capacities[] = {
     4124828355664746773ull, 9080577297740147699ull, 13948657424817642929ull,
 };
 
-extern void json_object_init(struct jsonObject *object) {
+extern void object_init(struct jsonObject *object) {
     assert(object);
     object->capacity = 0;
     object->size = 0;
@@ -40,7 +40,7 @@ extern void json_object_init(struct jsonObject *object) {
     object->last = NULL;
 }
 
-extern void json_object_free_internal(struct jsonObject *object) {
+extern void object_free_internal(struct jsonObject *object) {
     assert(object);
     for (size_t i = 0; i < object->capacity; ++i) {
         struct jsonObjectEntry *entry = &object->entries[i];
@@ -53,7 +53,7 @@ extern void json_object_free_internal(struct jsonObject *object) {
             assert(!entry->prev);
             continue;
         }
-        json_string_free_internal(entry->key);
+        string_free_internal(entry->key);
         json_free(entry->key);
         assert(entry->value);
         json_value_free(entry->value);
@@ -68,7 +68,7 @@ extern void json_object_free_internal(struct jsonObject *object) {
 
 /* Make object internal buffer big enough to hold `size` elements and keep good
  * performance of operations. */
-extern bool json_object_reserve(struct jsonObject *object, size_t size) {
+extern bool object_reserve(struct jsonObject *object, size_t size) {
     assert(object);
     size_t min_capacity = size * INVERSE_MAX_OCCUPANCY;
     if (min_capacity <= object->capacity) {
@@ -87,12 +87,12 @@ extern bool json_object_reserve(struct jsonObject *object, size_t size) {
     }
     struct jsonObjectEntry *old_entries = object->entries;
     struct jsonObjectEntry *entry = object->first;
-    json_object_init(object);
+    object_init(object);
     object->capacity = new_capacity;
     object->entries = new_entries;
     object->size = 0;
     while (entry) {
-        assert(json_object_add(object, entry->key, entry->value));
+        assert(object_add(object, entry->key, entry->value));
         entry->key = NULL;
         entry->value = NULL;
         entry = entry->next;
@@ -147,11 +147,11 @@ static void insert(struct jsonObject *object, struct jsonObjectEntry *prev, stru
     }
 }
 
-extern bool json_object_add(struct jsonObject *object, struct jsonString *key, struct jsonValue *value) {
+extern bool object_add(struct jsonObject *object, struct jsonString *key, struct jsonValue *value) {
     assert(object);
     assert(key);
     assert(value);
-    if (!json_object_reserve(object, object->size + 1)) {
+    if (!object_reserve(object, object->size + 1)) {
         return false;
     }
     unsigned hash = key->hash;
@@ -185,14 +185,14 @@ extern bool json_object_add(struct jsonObject *object, struct jsonString *key, s
     return true;
 }
 
-extern struct jsonValue *json_object_next(struct jsonObject *object, const char *key, struct jsonValue *prev) {
+extern struct jsonValue *object_next(struct jsonObject *object, const char *key, struct jsonValue *prev) {
     assert(object);
     assert(key);
     if (!object->capacity) {
         return NULL;
     }
     bool prev_was_met = !prev;
-    unsigned hash = json_string_hash(key);
+    unsigned hash = string_hash(key);
     for (size_t i = hash % object->capacity; ; i = (i + 1 == object->capacity ? 0 : i + 1)) {
         struct jsonObjectEntry *entry = &object->entries[i];
         // empty
@@ -213,51 +213,6 @@ extern struct jsonValue *json_object_next(struct jsonObject *object, const char 
     }
 }
 
-extern struct jsonValue *json_object_at(struct jsonObject *object, const char *key) {
-    return json_object_next(object, key, NULL);
+extern struct jsonValue *object_at(struct jsonObject *object, const char *key) {
+    return object_next(object, key, NULL);
 }
-
-extern bool json_value_object_add(struct jsonValue *object, const char *key, struct jsonValue *value) {
-    if (!object) {
-        errorf("object == NULL");
-        return false;
-    }
-    if (object->kind != JVK_OBJ) {
-        errorf("argument is not json object");
-        return false;
-    }
-    if (!key) {
-        errorf("key == NULL");
-        return false;
-    }
-    if (!value) {
-        errorf("value == NULL");
-        return false;
-    }
-    struct jsonString *jkey = json_malloc(sizeof(struct jsonString));
-    return jkey && 
-        json_string_init_str(jkey, key) && 
-        json_object_add(&object->v.object, jkey, value);
-}
-
-extern struct jsonValue *
-json_value_object_lookup_next(struct jsonValue *object, const char *key, struct jsonValue *value) {
-    if (!object) {
-        errorf("object == NULL");
-        return NULL;
-    }
-    if (object->kind != JVK_OBJ) {
-        errorf("argument is not json object");
-        return false;
-    }
-    if (!key) {
-        errorf("key == NULL");
-        return NULL;
-    }
-    return json_object_next(&object->v.object, key, value);
-}
-
-extern struct jsonValue *json_value_object_lookup(struct jsonValue *object, const char *key) {
-    return json_value_object_lookup_next(object, key, NULL);
-}
-

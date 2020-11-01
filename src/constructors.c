@@ -6,7 +6,7 @@
 #include "json.h"
 #include "json_internal.h"
 
-struct jsonValue *json_value_create_number(double number) {
+struct jsonValue *json_create_number(double number) {
     struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
@@ -16,7 +16,7 @@ struct jsonValue *json_value_create_number(double number) {
     return json;
 }
 
-struct jsonValue *json_value_create_string(const char *string) {
+struct jsonValue *json_create_string(const char *string) {
     if (!string) {
         errorf("string == NULL");
         return NULL;
@@ -26,34 +26,34 @@ struct jsonValue *json_value_create_string(const char *string) {
         return NULL;
     }
     json->kind = JVK_STR;
-    if (!json_string_init_str(&json->v.string, string)) {
+    if (!string_init_str(&json->v.string, string)) {
         json_free(json);
         return NULL;
     }
     return json;
 }
 
-struct jsonValue *json_value_create_object(void) {
+struct jsonValue *json_create_object(void) {
     struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
     json->kind = JVK_OBJ;
-    json_object_init(&json->v.object);
+    object_init(&json->v.object);
     return json;
 }
 
-struct jsonValue *json_value_create_array(void) {
+struct jsonValue *json_create_array(void) {
     struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
     json->kind = JVK_ARR;
-    json_array_init(&json->v.array);
+    array_init(&json->v.array);
     return json;
 }
 
-struct jsonValue *json_value_create_boolean(int boolean) {
+struct jsonValue *json_create_boolean(int boolean) {
     struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
@@ -63,7 +63,7 @@ struct jsonValue *json_value_create_boolean(int boolean) {
     return json;
 }
 
-struct jsonValue *json_value_create_null(void) {
+struct jsonValue *json_create_null(void) {
     struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
@@ -72,7 +72,7 @@ struct jsonValue *json_value_create_null(void) {
     return json;
 }
 
-bool json_value_array_append(struct jsonValue *array, struct jsonValue *value) {
+bool json_array_append(struct jsonValue *array, struct jsonValue *value) {
     if (!array) {
         errorf("array == NULL");
         return false;
@@ -85,6 +85,6 @@ bool json_value_array_append(struct jsonValue *array, struct jsonValue *value) {
         errorf("array->kind != JVK_ARR");
         return false;
     }
-    return json_array_append(&array->v.array, value);
+    return array_append(&array->v.array, value);
 }
 

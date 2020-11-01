@@ -36,21 +36,21 @@ static char * generate_cstr(void) {
 }
 
 static struct jsonValue * generate_str(void) {
-    return json_value_create_string(generate_cstr());
+    return json_create_string(generate_cstr());
 }
 
 static struct jsonValue * generate_num(void) {
     /*! this expression should produce both integral and fractional numbers */
     /*! in fact I expect quarter of the generated numbers to be integral */
-    return json_value_create_number((rand() - RAND_MAX / 2) / 4.); 
+    return json_create_number((rand() - RAND_MAX / 2) / 4.); 
 }
 
 static struct jsonValue * generate_bool(void) {
-    return json_value_create_boolean(rand() % 2);
+    return json_create_boolean(rand() % 2);
 }
 
 static struct jsonValue * generate_null(void) {
-    return json_value_create_null();
+    return json_create_null();
 }
 
 static char key_buffer[sizeof(cstr_buffer) + 100];
@@ -75,25 +75,25 @@ static struct jsonValue * generate_json(size_t n) {
     } 
     k = n / JSON_OBJARR_KEYS;
     if (rand() % 2) {
-        value = json_value_create_object();
+        value = json_create_object();
         if (!value) return NULL;
         for (i = 0; i < JSON_OBJARR_KEYS; ++i) {
             t = k + (i < n - k * JSON_OBJARR_KEYS ? 1 : 0);
             if (t == 0) break;
             subvalue = generate_json(t);
             key = generate_key(i);
-            if (!json_value_object_add(value, key, subvalue)) {
+            if (!json_object_add(value, key, subvalue)) {
                 printf("json_value_object_add failed\n");
                 exit(EXIT_FAILURE);
             }
         }
     } else {
-        value = json_value_create_array();
+        value = json_create_array();
         if (!value) return NULL;
         for (i = 0; i < JSON_OBJARR_KEYS; ++i) {
             t = k + (i < n - k * JSON_OBJARR_KEYS ? 1 : 0);
             if (t == 0) break;
-            if (!json_value_array_append(value, generate_json(t))) {
+            if (!json_array_append(value, generate_json(t))) {
                 printf("json_value_array_add failed\n");
                 exit(EXIT_FAILURE);
             }
@@ -112,7 +112,7 @@ static int are_equal_objects(struct jsonValue * left, struct jsonValue * right) 
     }
     entry = left->v.object.first;
     while (entry) {
-        lookup = json_value_object_lookup(right, entry->key->data);
+        lookup = json_object_lookup(right, entry->key->data);
         if (!lookup || !are_equal(entry->value, lookup)) {
             return 0;
         }
@@ -124,11 +124,11 @@ static int are_equal_objects(struct jsonValue * left, struct jsonValue * right) 
 static int are_equal_arrays(struct jsonValue * left, struct jsonValue * right) {
     struct jsonValue * left_element, * right_element;
     size_t i, n;
-    n = json_value_array_size(left);
-    if (n != json_value_array_size(right)) return 0;
+    n = json_array_size(left);
+    if (n != json_array_size(right)) return 0;
     for (i = 0; i < n; ++i) {
-        left_element = json_value_array_at(left, i);
-        right_element = json_value_array_at(right, i);
+        left_element = json_array_at(left, i);
+        right_element = json_array_at(right, i);
         if (!are_equal(left_element, right_element)) {
             return 0;
         }

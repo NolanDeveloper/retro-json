@@ -5,7 +5,7 @@ Hot:
 * Add pointer to parent as often it might be useful.
 * Add extended character set into stress test.
 * Fix compliance issues found using JSONTestSuite.
-* In parser and in all procedures working with Objects recurstion depth must be limited.
+* [solved](In parser and) in all procedures working with Objects recurstion depth must be limited.
 * Add as much documentation as possible
 * Add cool readme
 * Parser should be more inclusive. e.g. parse trailing comma (?) (take a look at JSONTestSuite)

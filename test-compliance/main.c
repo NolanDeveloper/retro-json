@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
         if (!json_str) {
             continue;
         }
-        struct jsonValue *json = json_parse(json_str);
+        struct jsonValue *json = json_parse(json_str, true);
         switch (type) {
         case 'y':
             if (json) {

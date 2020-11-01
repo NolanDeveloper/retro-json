@@ -3,7 +3,6 @@
 #include <threads.h>
 #include <uchar.h>
 
-#include "json.h"
 #include "json_internal.h"
 
 struct jsonValue *json_create_number(double number) {
@@ -53,7 +52,7 @@ struct jsonValue *json_create_array(void) {
     return json;
 }
 
-struct jsonValue *json_create_boolean(int boolean) {
+struct jsonValue *json_create_boolean(bool boolean) {
     struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;

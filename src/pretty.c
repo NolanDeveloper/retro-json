@@ -1,15 +1,10 @@
 #include <assert.h>
-#include <float.h>
 #include <math.h>
 #include <stdarg.h>
-#include <stdbool.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
-#include <threads.h>
-#include <uchar.h>
+#include <float.h>
 
-#include "json.h"
 #include "json_internal.h"
 
 static thread_local char *out_begin;
@@ -179,13 +174,17 @@ static void print_json_value(struct jsonValue *value) {
 }
 
 extern size_t json_pretty_print(char *out, size_t size, struct jsonValue *value) {
+    if (!value) {
+        errorf("value == NULL");
+        return 0;
+    }
     out_begin = out;
     out_size = size;
     position = 0;
     indent = 0;
     print_json_value(value);
-    if (size) {
-        out[size - 1] = '\0';
+    if (position < size) {
+        out[position] = '\0';
     } else {
         ++position;
     }

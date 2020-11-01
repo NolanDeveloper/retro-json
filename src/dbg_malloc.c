@@ -1,8 +1,8 @@
 #include <assert.h>
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
+
+#include "json_internal.h"
 
 struct Block {
     struct Block *next;

@@ -23,7 +23,7 @@ CFLAGS     += -fPIC
 
 LDLIBS     += -lpthread
 
-CPPFLAGS   += -I src
+CPPFLAGS   += -I includes -I src
 
 BUILD_DIR  := $(shell mkdir -p "build-$(MODE)" ; echo build-$(MODE) ; )
 
@@ -39,7 +39,7 @@ APPS       := $(PRETTIFY) $(TEST_APPS)
 .PHONY: all
 all: $(LIBRARY_A) $(LIBRARY_SO) $(PRETTIFY)
 
-# file compilation rule
+# .c → .o compilation rule
 
 CFILES := $(shell find * -name '*.c')
 $(patsubst %.c, $(BUILD_DIR)/%.o, $(CFILES)): $(BUILD_DIR)/%.o: %.c
@@ -51,7 +51,8 @@ $(patsubst %.c, $(BUILD_DIR)/%.o, $(CFILES)): $(BUILD_DIR)/%.o: %.c
 # applications are all directories with main.c
 
 .SECONDEXPANSION:
-$(APPS): $(BUILD_DIR)/%/a.out: $$(shell find % -name '*.c' | sed -E 's:(.*)\.c:$(BUILD_DIR)/\1.o:g') $(LIBRARY_A) 
+$(APPS): $(BUILD_DIR)/%/a.out: \
+$$(shell find % -name '*.c' | sed -E 's:(.*)\.c:$(BUILD_DIR)/\1.o:g') $(LIBRARY_A) 
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
 

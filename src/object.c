@@ -1,12 +1,6 @@
 #include <assert.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdlib.h>
 #include <string.h>
-#include <threads.h>
-#include <uchar.h>
 
-#include "json.h"
 #include "json_internal.h"
 
 #define INVERSE_MAX_OCCUPANCY 2

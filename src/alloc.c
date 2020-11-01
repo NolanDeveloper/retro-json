@@ -3,7 +3,6 @@
 #include <threads.h>
 #include <uchar.h>
 
-#include "json.h"
 #include "json_internal.h"
 
 void *json_malloc_(size_t size) {

@@ -1,5 +1,17 @@
+# build and doc directories
 build-*
-*.dep
-*.o
+doc
+
+# all hidden files
 .*
+# except .gitignore
 !.gitignore
+
+# QT creator files
+*.cflags
+*.config
+*.creator
+*.creator.user
+*.cxxflags
+*.files
+*.includes

@@ -5,7 +5,6 @@
 #include <threads.h>
 #include <uchar.h>
 
-#include "json.h"
 #include "json_internal.h"
 
 #define INITIAL_CAPACITY 6

@@ -3,7 +3,6 @@
 #include <math.h>
 #include <string.h>
 
-#include "json.h"
 #include "json_internal.h"
 
 static struct jsonValue *parse_value(void);
@@ -22,22 +21,30 @@ extern void json_exit(void) {
     error_exit();
 }
 
-extern struct jsonValue *json_parse(const char *json) {
+static void skip_spaces(void) {
+    while (*json_it && strchr("\x20\x09\x0A\x0D", *json_it)) {
+        ++json_it;
+    }
+}
+
+extern struct jsonValue *json_parse(const char *json, bool all) {
     if (!json) {
         errorf("json == NULL");
         return NULL;
     }
+    set_error(NULL);
     depth = 0;
     json_begin = json_it = json;
     struct jsonValue *value = parse_value();
-    json_begin = json_it = NULL;
-    return value;
-}
-
-static void skip_spaces(void) {
-    while (isspace(*json_it)) {
-        ++json_it;
+    skip_spaces();
+    if (all && value && *json_it) {
+        errorf("trailing bytes");
+        json_value_free(value);
+        return NULL;
     }
+    json_begin = json_it = NULL;
+    assert(!!value != !!strcmp(json_strerror(), "NULL"));
+    return value;
 }
 
 static bool consume_optionally(const char *str) {

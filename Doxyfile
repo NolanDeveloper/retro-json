@@ -1,0 +1,14 @@
+# Lets test with empty configuration
+PROJECT_NAME           = retro-json
+PROJECT_BRIEF          = Json parser and pretty printer writter in C11
+OUTPUT_DIRECTORY       = doc
+OUTPUT_LANGUAGE        = English
+INPUT                  = .
+FILE_PATTERNS          = *.c *.h
+RECURSIVE              = YES
+HAVE_DOT               = NO
+GENERATE_HTML          = YES
+GENERATE_DOCSET        = NO
+GENERATE_HTMLHELP      = NO
+GENERATE_LATEX         = NO
+

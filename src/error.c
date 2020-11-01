@@ -1,11 +1,6 @@
 #include <stdarg.h>
-#include <assert.h>
-#include <stdbool.h>
 #include <stdio.h>
-#include <threads.h>
-#include <uchar.h>
 
-#include "json.h"
 #include "json_internal.h"
 
 const char *error_out_of_memory = "out of memory";

@@ -43,7 +43,7 @@ int main(int argc, char ** argv) {
         result = EXIT_FAILURE;
         goto finish;
     }
-    value = json_parse(memory);
+    value = json_parse(memory, true);
     if (!value) {
         fprintf(stderr, "Failed to parse json: %s.\n", json_strerror());
         result = EXIT_FAILURE;

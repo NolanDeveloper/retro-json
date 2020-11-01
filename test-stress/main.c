@@ -10,7 +10,7 @@
 
 #define REPEATS 10000
 #define JSON_SIZE 30
-#define JSON_OBJARR_KEYS 10
+#define JSON_OBJARR_KEYS 3
 #define JSON_STR_SIZE 20 /* number of unicode code points */
 
 /*! At most single character can take up to 12 bytes in the form of hex encoded
@@ -166,9 +166,9 @@ static int are_equal(struct jsonValue * left, struct jsonValue * right) {
 static char json_str_buffer[100 * 1024];
 static char json_str_parsed_buffer[100 * 1024];
 
-#define RED "\x1b[31m"
-#define GREEN "\x1b[32m"
-#define RESET "\x1b[0m"
+#define RED   "\x1B[31m"
+#define GREEN "\x1B[32m"
+#define RESET "\x1B[0m"
 
 int main(int argc, char * argv[]) {
     struct jsonValue * json, * json_parsed;
@@ -179,7 +179,7 @@ int main(int argc, char * argv[]) {
     for (i = 0; i < REPEATS; ++i) {
         json = generate_json(JSON_SIZE);
         json_pretty_print(json_str_buffer, sizeof(json_str_buffer), json);
-        json_parsed = json_parse(json_str_buffer);
+        json_parsed = json_parse(json_str_buffer, true);
         if (!are_equal(json, json_parsed)) {
             json_pretty_print(json_str_parsed_buffer, sizeof(json_str_parsed_buffer), json_parsed);
             printf(RED "STRESS TEST FAILED\n" RESET);

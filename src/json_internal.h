@@ -1,7 +1,7 @@
 #ifndef JSON_INTERNAL_H
 #define JSON_INTERNAL_H
 
-#include "json.h"
+#include <json.h>
 
 #include <threads.h>
 #include <uchar.h>
@@ -62,8 +62,6 @@ struct jsonObjectEntry {
     struct jsonObjectEntry *next;
     struct jsonObjectEntry *prev;
 };
-
-enum jsonValueKind { JVK_STR, JVK_NUM, JVK_OBJ, JVK_ARR, JVK_BOOL, JVK_NULL };
 
 struct jsonValue {
     enum jsonValueKind kind;

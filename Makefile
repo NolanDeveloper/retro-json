@@ -1,14 +1,12 @@
-# or release
-MODE       ?= debug
+# or debug
+MODE       ?= release
 
 ifeq "$(MODE)" "debug"
 	CFLAGS += -g
 	CFLAGS += -O0
-else ifeq "$(MODE)" "debug-fast"
-	CFLAGS += -Ofast
 else ifeq "$(MODE)" "release"
 	CFLAGS += -DNDEBUG
-	CFLAGS += -Ofast
+	CFLAGS += -O2
 else 
 	ERR := $(error $$(MODE) = $(MODE) but should be one of: debug debug-fast release)
 endif

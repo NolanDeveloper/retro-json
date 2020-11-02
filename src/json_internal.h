@@ -46,7 +46,6 @@ struct jsonArray {
 };
 
 struct jsonObjectEntry;
-struct jsonValue;
 
 struct jsonObject {
     size_t capacity;
@@ -104,6 +103,14 @@ struct jsonValue *object_at(struct jsonObject *object, const char *key);
 
 void value_free_internal(struct jsonValue *value);
 
+void parser_begin(const char *json);
+void parser_end(void);
+struct jsonValue *parse_json_text(bool all);
+
+void pretty_print_begin(char *out, size_t size);
+size_t pretty_print_end(void);
+void print_json_value(struct jsonValue *value);
+
 enum c16Type {
     UTF16_NOT_SURROGATE,
     UTF16_SURROGATE_HIGH,
@@ -117,6 +124,8 @@ int c8len(char c);
 bool c32toc8(char32_t c32, int *n, char *c8);
 char32_t c8toc32(const char *c8);
 void c32toc16be(char32_t c32, char16_t out[2]);
+
+extern tss_t error_key;
 
 bool error_init(void);
 void error_exit(void);

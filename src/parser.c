@@ -5,46 +5,29 @@
 
 #include "json_internal.h"
 
-static struct jsonValue *parse_value(void);
-
 thread_local const char *json_begin;
 thread_local const char *json_it; 
 
 static thread_local size_t depth;
 static thread_local size_t max_depth = 1000;
 
-extern bool json_init(void) {
-    return error_init();
-}
+static struct jsonValue *parse_value(void);
 
-extern void json_exit(void) {
-    error_exit();
-}
-
-static void skip_spaces(void) {
-    while (*json_it && strchr("\x20\x09\x0A\x0D", *json_it)) {
-        ++json_it;
-    }
-}
-
-extern struct jsonValue *json_parse(const char *json, bool all) {
-    if (!json) {
-        errorf("json == NULL");
-        return NULL;
-    }
+extern void parser_begin(const char *json) {
+    assert(json);
     set_error(NULL);
     depth = 0;
     json_begin = json_it = json;
-    struct jsonValue *value = parse_value();
-    skip_spaces();
-    if (all && value && *json_it) {
-        errorf("trailing bytes");
-        json_value_free(value);
-        return NULL;
-    }
+}
+
+extern void parser_end(void) {
     json_begin = json_it = NULL;
-    assert(!!value != !!strcmp(json_strerror(), "NULL"));
-    return value;
+}
+
+extern void skip_spaces(void) {
+    while (*json_it && strchr("\x20\x09\x0A\x0D", *json_it)) {
+        ++json_it;
+    }
 }
 
 static bool consume_optionally(const char *str) {
@@ -396,3 +379,13 @@ static struct jsonValue *parse_value(void) {
     return value;
 }
 
+extern struct jsonValue *parse_json_text(bool all) {
+    struct jsonValue *value = parse_value();
+    skip_spaces();
+    if (all && value && *json_it) {
+        errorf("trailing bytes");
+        json_value_free(value);
+        value = NULL;
+    }
+    return value;
+}

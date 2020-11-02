@@ -69,11 +69,3 @@ extern bool array_append(struct jsonArray *array, struct jsonValue *value) {
     array->values[array->size++] = value;
     return true;
 }
-
-extern size_t json_array_size(struct jsonValue *array) {
-    return array ? array->v.array.size : 0;
-}
-
-extern struct jsonValue *json_array_at(struct jsonValue *array, size_t index) {
-    return (array && index < array->v.array.size) ? array->v.array.values[index] : NULL;
-}

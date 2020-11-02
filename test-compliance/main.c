@@ -87,11 +87,13 @@ int main(int argc, char *argv[]) {
             json_value_free(json);
         }
         free((char *) json_str);
+#ifndef NDEBUG
         if (!dbg_is_memory_clear()) {
             printf(RED "MEMORY LEAK" RESET " '%s'\n", filename);
             dbg_print_blocks();
             exit(EXIT_FAILURE);
         }
+#endif
     }
     json_exit();
     return EXIT_SUCCESS;

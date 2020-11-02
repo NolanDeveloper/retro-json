@@ -15,7 +15,22 @@ static thread_local unsigned indent;
 static thread_local const char *tab = "\t";
 static thread_local bool ascii_only = false;
 
-static void print_json_value(struct jsonValue *value);
+extern void pretty_print_begin(char *out, size_t size) {
+    out_begin = out;
+    out_size = size;
+    position = 0;
+    indent = 0;
+}
+
+extern size_t pretty_print_end(void) {
+    if (position < out_size) {
+        out_begin[position] = '\0';
+    } else {
+        ++position;
+    }
+    out_begin = NULL;
+    return position;
+}
 
 static void jprintf(const char *fmt, ...) {
     va_list args;
@@ -149,7 +164,7 @@ static void print_json_array(struct jsonArray *array) {
     jprintf("]");
 }
 
-static void print_json_value(struct jsonValue *value) {
+extern void print_json_value(struct jsonValue *value) {
     switch (value->kind) {
     case JVK_STR:  
         print_json_string(&value->v.string);
@@ -171,23 +186,4 @@ static void print_json_value(struct jsonValue *value) {
         jprintf("null");
         break;
     }
-}
-
-extern size_t json_pretty_print(char *out, size_t size, struct jsonValue *value) {
-    if (!value) {
-        errorf("value == NULL");
-        return 0;
-    }
-    out_begin = out;
-    out_size = size;
-    position = 0;
-    indent = 0;
-    print_json_value(value);
-    if (position < size) {
-        out[position] = '\0';
-    } else {
-        ++position;
-    }
-    out_begin = NULL;
-    return position;
 }

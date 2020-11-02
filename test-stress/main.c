@@ -193,6 +193,7 @@ int main(int argc, char * argv[]) {
         }
         json_value_free(json_parsed);
         json_value_free(json);
+#ifndef NDEBUG
         if (!dbg_is_memory_clear()) {
             printf(RED "STRESS TEST FAILED\n" RESET);
             printf("Attempt #%d\n", i);
@@ -200,6 +201,7 @@ int main(int argc, char * argv[]) {
             dbg_print_blocks();
             return EXIT_FAILURE;
         }
+#endif
     }
     printf(GREEN "STRESS TEST PASSED\n" RESET);
     return EXIT_SUCCESS;

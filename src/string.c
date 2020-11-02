@@ -4,7 +4,7 @@
 
 #include "json_internal.h"
 
-#define INITIAL_CAPACITY    16
+#define INITIAL_CAPACITY    32
 
 #define FNV_OFFSET_BASIS    2166136261u
 #define FNV_PRIME           16777619u
@@ -63,13 +63,13 @@ extern void string_free_internal(struct jsonString *string) {
     string->hash = FNV_OFFSET_BASIS;
 }
 
-static bool json_string_ensure_has_free_space(struct jsonString *string, size_t n) {
-    size_t new_capacity = string->capacity;
+static bool string_ensure_has_free_space(struct jsonString *string, size_t n) {
     if (string->size + n <= string->capacity) {
         return true;
     }
+    size_t new_capacity = string->capacity ? string->capacity : INITIAL_CAPACITY;
     do {
-        new_capacity = new_capacity ? 2 *new_capacity : INITIAL_CAPACITY;
+        new_capacity *= 2;
     } while (string->size + n > new_capacity);
     string->data = json_realloc(string->data, new_capacity);
     if (!string->data) {
@@ -80,14 +80,11 @@ static bool json_string_ensure_has_free_space(struct jsonString *string, size_t 
 }
 
 extern bool string_append(struct jsonString *string, char c) {
-    if (!json_string_ensure_has_free_space(string, 1)) {
+    if (!string_ensure_has_free_space(string, 1)) {
         return false;
     }
     string->data[string->size++] = c;
-    if (c) {
-        string->hash ^= c;
-        string->hash *= FNV_PRIME;
-    }
+    string->hash = (string->hash ^ c) * FNV_PRIME;
     return true;
 }
 
@@ -105,12 +102,12 @@ extern bool string_shrink(struct jsonString *string) {
 }
 
 extern unsigned string_hash(const char *str) {
-    unsigned n;
-    n = FNV_OFFSET_BASIS;
-    if (!str) return n;
-    while (*str) {
-        n ^= *str++;
-        n *= FNV_PRIME;
+    unsigned n = FNV_OFFSET_BASIS;
+    if (!str) {
+        return n;
     }
+    do {
+        n = (n ^ *str) * FNV_PRIME;
+    } while (*str++);
     return n;
 }

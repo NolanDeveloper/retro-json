@@ -5,7 +5,7 @@
 
 const char *error_out_of_memory = "out of memory";
 
-static tss_t error_key;
+tss_t error_key;
 
 static void free_error(void *error) {
     if (!error || error == error_out_of_memory) {
@@ -22,11 +22,6 @@ extern void error_exit(void) {
     char *error = tss_get(error_key);
     free_error(error);
     tss_delete(error_key);
-}
-
-extern const char *json_strerror(void) {
-    char *error = tss_get(error_key);
-    return error ? error : "NULL";
 }
 
 extern void set_error(const char *e) {

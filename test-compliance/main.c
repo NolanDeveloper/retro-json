@@ -17,26 +17,26 @@
 #define BLUE   "\x1b[34m"
 #define RESET  "\x1b[0m"
 
-static const char *read_file(const char *filename) {
-    char *buffer = NULL;
-    long length;
+char *file_bytes;
+size_t file_size;
+
+static void read_file(const char *filename) {
     FILE *f = fopen(filename, "rb");
     if (!f) {
         perror(filename);
-        return NULL;
+        exit(EXIT_FAILURE);
     }
     fseek(f, 0, SEEK_END);
-    length = ftell(f);
+    file_size = ftell(f);
     fseek(f, 0, SEEK_SET);
-    buffer = malloc(length + 1);
-    if (!buffer) {
+    file_bytes = malloc(file_size + 1);
+    if (!file_bytes) {
         perror("malloc");
-        return NULL;
+        exit(EXIT_FAILURE);
     }
-    fread(buffer, 1, length, f);
+    fread(file_bytes, 1, file_size, f);
     fclose(f);
-    buffer[length] = '\0';
-    return buffer;
+    file_bytes[file_size] = '\0';
 }
 
 int main(int argc, char *argv[]) {
@@ -48,29 +48,29 @@ int main(int argc, char *argv[]) {
         printf("json_init failed\n");
         return EXIT_FAILURE;
     }
-    for (int i = 1; argv[i]; ++i) {
+    bool ok = true;
+    for (int i = 1; ok && argv[i]; ++i) {
         char *filename = argv[i];
         char type = basename(filename)[0];
         if (!strchr("yni", type)) {
             printf("file name doesn't start with 'y', 'n', or 'i': %s\n", filename);
             continue;
         }
-        const char *json_str = read_file(filename);
-        if (!json_str) {
-            continue;
-        }
-        struct jsonValue *json = json_parse(json_str, true);
+        read_file(filename);
+        struct jsonValue *json = json_parse_mem(file_bytes, file_size, true);
         switch (type) {
         case 'y':
             if (json) {
                 printf(GREEN "TEST PASSED" RESET " '%s'\n", filename);
             } else {
                 printf(RED "FAILED TO PARSE" RESET " '%s' (%s)\n", filename, json_strerror());
+                ok = false;
             }
             break;
         case 'n':
             if (json) {
                 printf(RED "PARSER DIDN'T FAIL" RESET " '%s'\n", filename);
+                ok = false;
             } else {
                 printf(GREEN "TEST PASSED" RESET " '%s' (%s)\n", filename, json_strerror());
             }
@@ -86,7 +86,9 @@ int main(int argc, char *argv[]) {
         if (json) {
             json_value_free(json);
         }
-        free((char *) json_str);
+        free(file_bytes);
+        file_bytes = NULL;
+        file_size = 0;
 #ifndef RELEASE
         if (!dbg_is_memory_clear()) {
             printf(RED "MEMORY LEAK" RESET " '%s'\n", filename);
@@ -96,5 +98,5 @@ int main(int argc, char *argv[]) {
 #endif
     }
     json_exit();
-    return EXIT_SUCCESS;
+    return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }

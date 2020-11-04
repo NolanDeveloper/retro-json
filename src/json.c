@@ -271,7 +271,7 @@ extern struct jsonValue *json_array_at(struct jsonValue *array, size_t index) {
 
 extern const char *json_strerror(void) {
     char *error = tss_get(error_key);
-    return error ? error : "NULL";
+    return error ? error : "";
 }
 
 extern struct jsonValue *json_parse(const char *json, bool all) {
@@ -279,10 +279,22 @@ extern struct jsonValue *json_parse(const char *json, bool all) {
         errorf("json == NULL");
         return NULL;
     }
-    parser_begin(json);
+    parser_begin(json, strlen(json));
     struct jsonValue *value = parse_json_text(all);
     parser_end();
-    assert(!!value != !!strcmp(json_strerror(), "NULL"));
+    assert(!!value != !!strcmp(json_strerror(), ""));
+    return value;
+}
+
+struct jsonValue *json_parse_mem(const char *buffer, size_t size, bool all) {
+    if (!buffer) {
+        errorf("buffer == NULL");
+        return NULL;
+    }
+    parser_begin(buffer, size);
+    struct jsonValue *value = parse_json_text(all);
+    parser_end();
+    assert(!!value != !!strcmp(json_strerror(), ""));
     return value;
 }
 

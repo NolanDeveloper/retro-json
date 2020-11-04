@@ -292,6 +292,17 @@ struct jsonValue *json_array_at(struct jsonValue *array, size_t index);
 struct jsonValue *json_parse(const char *json, bool all);
 
 /*!
+ * \brief Parse json from memory buffer.
+ * \param buffer UTF-8 encoded and NOT NULL TERMINATED.
+ * \param size Size of buffer.
+ * \param all Is it required to parse whole buffer or unparsed trailing bytes are allowed.
+ * \return
+ * - parsed value;
+ * - NULL, if something went wrong.
+ */
+struct jsonValue *json_parse_mem(const char *buffer, size_t size, bool all);
+
+/*!
  * \brief Prints json value in a pretty way.
  * \details Acts like snprint i.e. passing size = 0 allows to precalculate out buffer size. Then you may allocate
  * buffer of required size and pass to the function again. If size != 0 output guaranteed have trailing '\0'.

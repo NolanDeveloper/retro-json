@@ -62,17 +62,6 @@ static char *asprintf(const char *fmt, ...) {
 }
 
 extern void errorf(const char *fmt, ...) {
-    unsigned line = 1;
-    unsigned column = 0;
-    const char *p = json_begin;
-    while (*p && p != json_it) {
-        if ('\n' == *p) {
-            ++line;
-            column = 0;
-        }
-        ++column;
-        ++p;
-    }
     va_list args;
     va_start(args, fmt);
     char *message = vasprintf(fmt, args);

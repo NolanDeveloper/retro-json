@@ -3,6 +3,7 @@
 
 #include <json.h>
 
+#include <stdio.h>
 #include <threads.h>
 #include <uchar.h>
 
@@ -113,7 +114,7 @@ struct jsonValue *object_at(struct jsonObject *object, const char *key);
 
 void value_free_internal(struct jsonValue *value);
 
-void parser_begin(const char *json);
+void parser_begin(const char *buffer, size_t n);
 void parser_end(void);
 struct jsonValue *parse_json_text(bool all);
 
@@ -142,8 +143,8 @@ void error_exit(void);
 void set_error(const char *e);
 
 extern const char *error_out_of_memory;
-extern thread_local const char *json_begin; //!< holds start of json string during json_parse recursive calls
-extern thread_local const char *json_it;
+extern thread_local unsigned long line;
+extern thread_local unsigned long column;
 
 void errorf(const char *fmt, ...);
 

@@ -71,14 +71,15 @@ extern void string_free_internal(struct jsonString *string) {
     string->hash = FNV_OFFSET_BASIS;
 }
 
-static bool string_ensure_has_free_space(struct jsonString *string, size_t n) {
-    if (string->size + n <= string->capacity) {
+static bool string_reserve(struct jsonString *string, size_t min_capacity) {
+    assert(string);
+    if (min_capacity <= string->capacity) {
         return true;
     }
     size_t new_capacity = string->capacity ? string->capacity : INITIAL_CAPACITY;
     do {
         new_capacity *= 2;
-    } while (string->size + n > new_capacity);
+    } while (new_capacity < min_capacity);
     string->data = json_realloc(string->data, new_capacity);
     if (!string->data) {
         return false;
@@ -88,7 +89,8 @@ static bool string_ensure_has_free_space(struct jsonString *string, size_t n) {
 }
 
 extern bool string_append(struct jsonString *string, char c) {
-    if (!string_ensure_has_free_space(string, 1)) {
+    assert(string);
+    if (!string_reserve(string, string->size + 1)) {
         return false;
     }
     string->data[string->size++] = c;

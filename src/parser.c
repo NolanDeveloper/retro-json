@@ -6,7 +6,7 @@
 #include "json_internal.h"
 
 thread_local const char *json_begin;
-thread_local const char *json_it; 
+thread_local const char *json_it;
 
 static thread_local size_t depth;
 static thread_local size_t max_depth = 1000;
@@ -106,27 +106,27 @@ static bool parse_string(struct jsonString *string) {
         case '\\':
             ++json_it;
             switch (*json_it) {
-            case '\\': 
-            case '"': 
-            case '/': 
+            case '\\':
+            case '"':
+            case '/':
                 if (!string_append(string, *json_it)) {
                     return false;
                 }
                 ++json_it;
                 break;
-            case 'b': 
+            case 'b':
                 if (!string_append(string, '\b')) {
                     return false;
                 }
                 ++json_it;
                 break;
-            case 'f': 
+            case 'f':
                 if (!string_append(string, '\f')) {
                     return false;
                 }
                 ++json_it;
                 break;
-            case 'n': 
+            case 'n':
                 if (!string_append(string, '\n')) {
                     return false;
                 }
@@ -156,7 +156,7 @@ static bool parse_string(struct jsonString *string) {
                     char32_t next = 0;
                     if (!parse_hex4(&next)) {
                         return false;
-                    } 
+                    }
                     if (c16type(next) != UTF16_SURROGATE_LOW) {
                         json_it = t;
                     } else {
@@ -173,7 +173,7 @@ static bool parse_string(struct jsonString *string) {
                 return false;
             }
             break;
-        default: 
+        default:
             string_append(string, *json_it);
             ++json_it;
             break;

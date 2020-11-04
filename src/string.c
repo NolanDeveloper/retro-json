@@ -17,6 +17,14 @@ extern struct jsonString *string_create(void) {
     return string;
 }
 
+extern struct jsonString *string_create_str(const char *str) {
+    struct jsonString *string = json_malloc(sizeof(struct jsonString));
+    if (string) {
+        string_init_str(string, str);
+    }
+    return string;
+}
+
 extern void string_init(struct jsonString *string) {
     assert(string);
     string->capacity = 0;

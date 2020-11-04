@@ -50,7 +50,7 @@ static void print_indent(void) {
 static void print_json_string(struct jsonString *string) {
     assert(string);
     jprintf("\"");
-    const char * must_be_escaped = 
+    const char * must_be_escaped =
         "\"\\\x01\x02\x03\x04\x05\x06\x07"
         "\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F"
         "\x10\x11\x12\x13\x14\x15\x16\x17"
@@ -98,7 +98,7 @@ static void print_json_string(struct jsonString *string) {
                 jprintf("%c", c);
                 break;
             }
-        } 
+        }
     }
     jprintf("\"");
 }
@@ -107,7 +107,7 @@ static void print_json_number(double number) {
     if (isnan(number)) {
         jprintf("null");
         return;
-    } 
+    }
     if (isinf(number) == 1) {
         number = DBL_MAX;
     } else if (isinf(number) == -1) {
@@ -128,7 +128,11 @@ static void print_json_object(struct jsonObject *object) {
     jprintf("{\n");
     ++indent;
     bool latch = false;
-    for (struct jsonObjectEntry *entry = object->first; entry; entry = entry->next) {
+    for (size_t i = 0; i < object->capacity; ++i) {
+        struct jsonObjectEntry *entry = &object->entries[i];
+        if (!entry->key || entry->key == &key_deleted) {
+            continue;
+        }
         if (latch) {
             jprintf(",\n");
         }
@@ -166,23 +170,23 @@ static void print_json_array(struct jsonArray *array) {
 
 extern void print_json_value(struct jsonValue *value) {
     switch (value->kind) {
-    case JVK_STR:  
+    case JVK_STR:
         print_json_string(&value->v.string);
         break;
-    case JVK_NUM:  
+    case JVK_NUM:
         print_json_number(value->v.number);
         break;
-    case JVK_OBJ:  
+    case JVK_OBJ:
         print_json_object(&value->v.object);
         break;
-    case JVK_ARR:  
+    case JVK_ARR:
         print_json_array(&value->v.array);
         break;
-    case JVK_BOOL: 
+    case JVK_BOOL:
         jprintf(value->v.boolean ? "true" : "false");
         break;
-    case JVK_NULL: 
-    default:       
+    case JVK_NULL:
+    default:
         jprintf("null");
         break;
     }

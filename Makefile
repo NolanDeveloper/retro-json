@@ -5,8 +5,8 @@ ifeq "$(MODE)" "debug"
 	CFLAGS += -g
 	CFLAGS += -O0
 else ifeq "$(MODE)" "release"
-	CFLAGS += -DNDEBUG
-	CFLAGS += -O2
+	CFLAGS   += -O2
+	CPPFLAGS += RELEASE
 else 
 	ERR := $(error $$(MODE) = $(MODE) but should be one of: debug debug-fast release)
 endif
@@ -21,7 +21,8 @@ CFLAGS     += -fPIC
 
 LDLIBS     += -lpthread
 
-CPPFLAGS   += -I includes -I src
+CPPFLAGS   += -I includes
+CPPFLAGS   += -I src
 
 BUILD_DIR  := $(shell mkdir -p "build-$(MODE)" ; echo build-$(MODE) ; )
 

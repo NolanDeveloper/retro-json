@@ -77,7 +77,7 @@ extern char32_t c8toc32(const char *c8) {
     unsigned char c = *c8++;
     if (c <= 0x7F) {
         return c;
-    } 
+    }
     unsigned char c2 = *c8++;
     if (0xC2 <= c && c <= 0xDF) {
         return ((c & 0x1F) << 6) + (c2 & 0x3F);

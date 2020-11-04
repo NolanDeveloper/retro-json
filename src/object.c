@@ -1,11 +1,13 @@
 #include <assert.h>
+#include <limits.h>
 #include <string.h>
 
 #include "json_internal.h"
 
 #define INVERSE_MAX_OCCUPANCY 2
 
-static const struct jsonString key_deleted;
+const struct jsonString key_deleted;
+static thread_local unsigned long long uniq = 1;
 
 // array of prime numbers of strictly growing bit length
 static const size_t prime_capacities[] = {
@@ -29,9 +31,8 @@ extern void object_init(struct jsonObject *object) {
     assert(object);
     object->capacity = 0;
     object->size = 0;
+    object->unique_size = 0;
     object->entries = NULL;
-    object->first = NULL;
-    object->last = NULL;
 }
 
 extern void object_free_internal(struct jsonObject *object) {
@@ -39,14 +40,14 @@ extern void object_free_internal(struct jsonObject *object) {
     for (size_t i = 0; i < object->capacity; ++i) {
         struct jsonObjectEntry *entry = &object->entries[i];
         if (!entry->key) {
+            assert(!entry->value);
             continue;
         }
         if (entry->key == &key_deleted) {
             assert(!entry->value);
-            assert(!entry->next);
-            assert(!entry->prev);
             continue;
         }
+        assert(entry->value);
         string_free_internal(entry->key);
         json_free(entry->key);
         assert(entry->value);
@@ -56,8 +57,6 @@ extern void object_free_internal(struct jsonObject *object) {
     object->capacity = 0;
     object->size = 0;
     object->entries = NULL;
-    object->first = NULL;
-    object->last = NULL;
 }
 
 /* Make object internal buffer big enough to hold `size` elements and keep good
@@ -80,65 +79,22 @@ extern bool object_reserve(struct jsonObject *object, size_t size) {
         return false;
     }
     struct jsonObjectEntry *old_entries = object->entries;
-    struct jsonObjectEntry *entry = object->first;
+    size_t old_capacity = object->capacity;
     object_init(object);
     object->capacity = new_capacity;
     object->entries = new_entries;
     object->size = 0;
-    while (entry) {
+    for (size_t i = 0; i < old_capacity; ++i) {
+        struct jsonObjectEntry *entry = &old_entries[i];
+        if (!entry->key || entry->key == &key_deleted) {
+            continue;
+        }
         assert(object_add(object, entry->key, entry->value));
         entry->key = NULL;
         entry->value = NULL;
-        entry = entry->next;
     }
     json_free(old_entries);
     return true;
-}
-
-/* Remove entry from linked list. */
-static void cut(struct jsonObject *object, struct jsonObjectEntry *entry) {
-    assert(object);
-    assert(entry);
-    if (object->first == entry) {
-        object->first = entry->next;
-    }
-    if (object->last == entry) {
-        object->last = entry->prev;
-    }
-    if (entry->prev) {
-        assert(entry->prev->next == entry);
-        entry->prev->next = entry->next;
-    }
-    if (entry->next) {
-        assert(entry->next->prev == entry);
-        entry->next->prev = entry->prev;
-    }
-    entry->next = entry->prev = NULL;
-}
-
-/* Add entry to linked list after `prev` or put it first if `prev` == NULL. */
-static void insert(struct jsonObject *object, struct jsonObjectEntry *prev, struct jsonObjectEntry *entry) {
-    assert(object);
-    assert(entry);
-    assert(!entry->prev);
-    assert(!entry->next);
-    if (!prev) {
-        entry->next = object->first;
-        object->first = entry;
-        if (!object->last) {
-            object->last = entry;
-        }
-    } else {
-        entry->next = prev->next;
-        if (entry->next) {
-            entry->next->prev = entry;
-        }
-        entry->prev = prev;
-        prev->next = entry;
-        if (prev == object->last) {
-            object->last = entry;
-        }
-    }
 }
 
 extern bool object_add(struct jsonObject *object, struct jsonString *key, struct jsonValue *value) {
@@ -149,34 +105,68 @@ extern bool object_add(struct jsonObject *object, struct jsonString *key, struct
         return false;
     }
     unsigned hash = key->hash;
-    struct jsonObjectEntry *prev = object->last;
+    bool is_duplicate = false;
+    for (size_t i = hash % object->capacity; ; i = (i + 1 == object->capacity ? 0 : i + 1)) {
+        struct jsonObjectEntry *entry = &object->entries[i];
+        // empty or deleted
+        if (!entry->key || entry->key == &key_deleted) {
+            entry->key = key;
+            entry->value = value;
+            entry->id = uniq++;
+            break;
+        }
+        // duplicate
+        if (!is_duplicate && entry->key->hash == hash && !strcmp(entry->key->data, key->data)) {
+            is_duplicate = true;
+        }
+        // otherwise it's occupied with a different key
+    }
+    ++object->size;
+    if (!is_duplicate) {
+        ++object->unique_size;
+    }
+    return true;
+}
+
+extern void
+object_get_entry(struct jsonObject *object, size_t i, struct jsonString **out_key, struct jsonValue **out_value) {
+    assert(object);
+    assert(i < object->capacity);
+    struct jsonValue *value = object->entries[i].value;
+    struct jsonString *key = object->entries[i].key;
+    if (key == &key_deleted) {
+        key = NULL;
+    }
+    assert(!!value == !!key);
+    *out_key = key;
+    *out_value = value;
+}
+
+static unsigned long long id_of(struct jsonObject *object, unsigned hash, const char *key, struct jsonValue *prev) {
+    assert(object);
+    assert(key);
+    assert(object->capacity);
+    assert_slow(hash == string_hash(key));
+    if (!prev) {
+        return LLONG_MAX;
+    }
     for (size_t i = hash % object->capacity; ; i = (i + 1 == object->capacity ? 0 : i + 1)) {
         struct jsonObjectEntry *entry = &object->entries[i];
         // empty
         if (!entry->key) {
-            entry->key = key;
-            entry->value = value;
-            entry->prev = entry->next = NULL;
-            insert(object, prev, entry);
-            break;
+            return 0;
         }
         // deleted
         if (entry->key == &key_deleted) {
             continue;
         }
-        // duplicate
-        if (entry->key->hash == hash && !strcmp(entry->key->data, key->data)) {
-            struct jsonObjectEntry *new_prev = entry->prev;
-            cut(object, entry);
-            struct jsonValue *old_value = entry->value;
-            entry->value = value;
-            value = old_value;
-            insert(object, prev, entry);
-            prev = new_prev;
+        // matching && value == prev
+        if (entry->key->hash == hash && !strcmp(entry->key->data, key) && entry->value == prev) {
+            return entry->id;
         }
+        // otherwise it's occupied with a different key
     }
-    ++object->size;
-    return true;
+    assert(false);
 }
 
 extern struct jsonValue *object_next(struct jsonObject *object, const char *key, struct jsonValue *prev) {
@@ -185,26 +175,33 @@ extern struct jsonValue *object_next(struct jsonObject *object, const char *key,
     if (!object->capacity) {
         return NULL;
     }
-    bool prev_was_met = !prev;
     unsigned hash = string_hash(key);
+    unsigned long long prev_id = id_of(object, hash, key, prev);
+    if (!prev_id) {
+        return NULL;
+    }
+    unsigned long long id_greatest_less_than_prev_id = 0;
+    struct jsonValue *value = NULL;
     for (size_t i = hash % object->capacity; ; i = (i + 1 == object->capacity ? 0 : i + 1)) {
         struct jsonObjectEntry *entry = &object->entries[i];
         // empty
         if (!entry->key) {
-            return NULL;
+            break;
         }
         // deleted
         if (entry->key == &key_deleted) {
             continue;
         }
-        // match
-        if (entry->key->hash == hash && !strcmp(entry->key->data, key)) {
-            if (prev_was_met) {
-                return entry->value;
-            }
-            prev_was_met = prev == entry->value;
+        // matching
+        if (entry->key->hash == hash
+                && !strcmp(entry->key->data, key)
+                && entry->id > id_greatest_less_than_prev_id
+                && entry->id < prev_id) {
+            id_greatest_less_than_prev_id = entry->id;
+            value = entry->value;
         }
     }
+    return value;
 }
 
 extern struct jsonValue *object_at(struct jsonObject *object, const char *key) {

@@ -4,11 +4,9 @@ MODE       ?= release
 ifeq "$(MODE)" "debug"
 	CFLAGS += -g
 	CFLAGS += -O0
-else ifeq "$(MODE)" "release"
+else
 	CFLAGS   += -O2
-	CPPFLAGS += RELEASE
-else 
-	ERR := $(error $$(MODE) = $(MODE) but should be one of: debug debug-fast release)
+	CPPFLAGS += -DRELEASE
 endif
 
 CFLAGS     += -std=c11

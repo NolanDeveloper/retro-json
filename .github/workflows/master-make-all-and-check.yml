@@ -1,4 +1,4 @@
-name: build and test
+name: BUILD/TEST
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: make
-      run: make
+    - name: make MODE=release
+      run: make MODE=release
     - name: make MODE=debug check
       run: make MODE=debug check

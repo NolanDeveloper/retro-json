@@ -6,6 +6,7 @@ doc
 .*
 # except .gitignore
 !.gitignore
+!.github
 
 # QT creator files
 *.cflags

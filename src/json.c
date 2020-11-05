@@ -428,7 +428,7 @@ static struct jsonValue *duplicate_object(struct jsonObject *object) {
         if (!key_copy) {
             goto fail;
         }
-        value_copy = json_duplicate(value);
+        value_copy = json_copy(value);
         if (!value_copy) {
             goto fail;
         }
@@ -456,7 +456,7 @@ static struct jsonValue *duplicate_array(struct jsonArray *array) {
     for (size_t i = 0; i < n; ++i) {
         struct jsonValue *value = array->values[i];
         assert(value);
-        value_copy = json_duplicate(value);
+        value_copy = json_copy(value);
         if (!value_copy) {
             goto fail;
         }
@@ -470,7 +470,7 @@ fail:
     return NULL;
 }
 
-extern struct jsonValue *json_duplicate(struct jsonValue *value) {
+extern struct jsonValue *json_copy(struct jsonValue *value) {
     if (!value) {
         return value;
     }
@@ -484,7 +484,7 @@ extern struct jsonValue *json_duplicate(struct jsonValue *value) {
     case JVK_ARR:
         return duplicate_array(&value->v.array);
     case JVK_BOOL:
-        return json_create_boolean(&value->v.boolean);
+        return json_create_boolean(value->v.boolean);
     case JVK_NULL:
         return json_create_null();
     default:
@@ -533,7 +533,11 @@ static bool arrays_are_equal(struct jsonArray *left, struct jsonArray *right) {
 
 static bool are_equal(struct jsonValue *left, struct jsonValue *right) {
     bool result = true;
-    if (!!left != !!right) {
+    if (!left && !right) {
+        result = true;
+        goto end;
+    }
+    if (!left || !right) {
         result = false;
         goto end;
     }

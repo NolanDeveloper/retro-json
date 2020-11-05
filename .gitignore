@@ -15,3 +15,6 @@ doc
 *.cxxflags
 *.files
 *.includes
+
+# compilation database file
+compile_commands.json

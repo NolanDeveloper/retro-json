@@ -318,7 +318,7 @@ size_t json_pretty_print(char *out, size_t size, struct jsonValue *value);
  * \param value What to make copy of.
  * \returns A copy of \p value.
  */
-struct jsonValue *json_duplicate(struct jsonValue *value);
+struct jsonValue *json_copy(struct jsonValue *value);
 
 /*!
  * \brief Checks whether two json values are semantically equal.

@@ -6,10 +6,6 @@
 
 #include "tests.h"
 
-#define RED "\x1b[31m"
-#define GREEN "\x1b[32m"
-#define RESET "\x1b[0m"
-
 static struct {
     bool (*run)(void);
     const char *name;
@@ -36,6 +32,7 @@ int main(int argc, char *argv[]) {
             printf(GREEN "%s UNIT TEST PASSED\n" RESET, tests[i].name);
         } else {
             printf(RED "%s UNIT TEST FAILED\n" RESET, tests[i].name);
+            return EXIT_FAILURE;
         }
     }
     json_exit();

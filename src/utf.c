@@ -8,18 +8,14 @@
 #include "json_internal.h"
 
 extern int c16len(char16_t c16) {
-    return 0x1B == (c16 >> 11) ? 2 : 1;
+    return 0xD800 == (0xF800 & c16) ? 2 : 1;
 }
 
 extern enum c16Type c16type(char16_t c16) {
-    if (c16 & 0xD800) {
-        if (c16 & 0x400) {
-            return UTF16_SURROGATE_LOW;
-        } else {
-            return UTF16_SURROGATE_HIGH;
-        }
+    if (1 == c16len(c16)) {
+        return UTF16_NOT_SURROGATE;
     }
-    return UTF16_NOT_SURROGATE;
+    return c16 & 0x0400 ? UTF16_SURROGATE_LOW : UTF16_SURROGATE_HIGH;
 }
 
 extern int c8len(char c) {
@@ -91,6 +87,8 @@ extern char32_t c8toc32(const char *c8) {
 }
 
 extern char32_t c16pairtoc32(char16_t high, char16_t low) {
+    assert(UTF16_SURROGATE_HIGH == c16type(high));
+    assert(UTF16_SURROGATE_LOW == c16type(low));
     return 0x10000ull + ((high & 0x3FFull) << 10) + (low & 0x3ffull);
 }
 

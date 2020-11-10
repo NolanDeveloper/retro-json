@@ -68,19 +68,6 @@ extern bool c32toc8(char32_t c32, int *n, char *c8) {
     return false;
 }
 
-extern int c32c8len(char32_t c32) {
-    if (c32 < 0x0080) {
-        return 1;
-    }
-    if (c32 < 0x0800) {
-        return 2;
-    }
-    if (c32 < 0x10000ull) {
-        return 3;
-    }
-    return 4;
-}
-
 extern bool c8toc32(const char *c8, char32_t *c32) {
     assert(c8);
     assert(c32);
@@ -118,7 +105,10 @@ extern bool c8toc32(const char *c8, char32_t *c32) {
         errorf("illegal code point");
         return false;
     }
-    if (c32c8len(result) < len) {
+    char c8seq[4];
+    int n;
+    assert(c32toc8(result, &n, c8seq));
+    if (n < len) {
         errorf("overlong UTF-8 sequence");
         return false;
     }

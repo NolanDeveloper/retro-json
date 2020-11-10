@@ -133,7 +133,6 @@ enum c16Type c16type(char16_t c16);
 char32_t c16pairtoc32(char16_t high, char16_t low);
 int c8len(char c);
 bool c32toc8(char32_t c32, int *n, char *c8);
-int c32c8len(char32_t c32);
 bool c8toc32(const char *c8, char32_t *c32);
 void c32toc16be(char32_t c32, char16_t out[2]);
 bool c32islegal(char32_t c32);

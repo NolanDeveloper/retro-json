@@ -1,18 +1,44 @@
 #include <assert.h>
-#include <string.h>
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "json_internal.h"
 
+static thread_local bool is_initialized;
+
+static void check_is_initialized(void) {
+    if (is_initialized) {
+        return;
+    }
+    fprintf(stderr, "json library was not initialized");
+    exit(EXIT_FAILURE);
+}
+
+/*! Must be called first in all exported functions except json_strerror() */
+static void prepare(void) {
+    check_is_initialized();
+    set_error(NULL);
+}
+
 extern bool json_init(void) {
+    if (is_initialized) {
+        return true;
+    }
+    is_initialized = true;
     return error_init();
 }
 
 extern void json_exit(void) {
+    if (!is_initialized) {
+        return;
+    }
+    is_initialized = false;
     error_exit();
 }
 
 extern void value_free_internal(struct jsonValue *value) {
+    check_is_initialized();
     if (!value) {
         return;
     }
@@ -38,6 +64,7 @@ extern void value_free_internal(struct jsonValue *value) {
 }
 
 extern void json_value_free(struct jsonValue *value) {
+    check_is_initialized();
     if (!value) {
         return;
     }
@@ -46,6 +73,7 @@ extern void json_value_free(struct jsonValue *value) {
 }
 
 extern struct jsonValue *json_create_number(double number) {
+    prepare();
     struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
@@ -56,6 +84,7 @@ extern struct jsonValue *json_create_number(double number) {
 }
 
 extern struct jsonValue *json_create_string(const char *string) {
+    prepare();
     if (!string) {
         errorf("string == NULL");
         return NULL;
@@ -73,6 +102,7 @@ extern struct jsonValue *json_create_string(const char *string) {
 }
 
 extern struct jsonValue *json_create_object(size_t initial_capacity) {
+    prepare();
     struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
@@ -88,6 +118,7 @@ extern struct jsonValue *json_create_object(size_t initial_capacity) {
 }
 
 extern struct jsonValue *json_create_array(size_t initial_capacity) {
+    prepare();
     struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
@@ -103,6 +134,7 @@ extern struct jsonValue *json_create_array(size_t initial_capacity) {
 }
 
 extern struct jsonValue *json_create_boolean(bool boolean) {
+    prepare();
     struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
@@ -113,6 +145,7 @@ extern struct jsonValue *json_create_boolean(bool boolean) {
 }
 
 extern struct jsonValue *json_create_null(void) {
+    prepare();
     struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
@@ -122,6 +155,7 @@ extern struct jsonValue *json_create_null(void) {
 }
 
 extern bool json_get_number(struct jsonValue *number, double *value) {
+    prepare();
     if (!value) {
         errorf("value == NULL");
         return false;
@@ -141,6 +175,7 @@ extern bool json_get_number(struct jsonValue *number, double *value) {
 }
 
 extern bool json_get_string(struct jsonValue *string, const char **value) {
+    prepare();
     if (!value) {
         errorf("value == NULL");
         return false;
@@ -160,6 +195,7 @@ extern bool json_get_string(struct jsonValue *string, const char **value) {
 }
 
 extern bool json_get_string_length(struct jsonValue *string, size_t *length) {
+    prepare();
     if (!length) {
         errorf("length == NULL");
         return false;
@@ -178,6 +214,7 @@ extern bool json_get_string_length(struct jsonValue *string, size_t *length) {
 }
 
 extern bool json_get_boolean(struct jsonValue *boolean, bool *value) {
+    prepare();
     if (!value) {
         errorf("value == NULL");
         return false;
@@ -197,6 +234,7 @@ extern bool json_get_boolean(struct jsonValue *boolean, bool *value) {
 }
 
 extern bool json_set_number(struct jsonValue *number, double value) {
+    prepare();
     if (!number) {
         errorf("number == NULL");
         return false;
@@ -214,6 +252,7 @@ extern bool json_set_number(struct jsonValue *number, double value) {
 }
 
 extern bool json_set_string(struct jsonValue *string, const char *value) {
+    prepare();
     if (!string) {
         errorf("string == NULL");
         return false;
@@ -231,6 +270,7 @@ extern bool json_set_string(struct jsonValue *string, const char *value) {
 }
 
 extern bool json_set_boolean(struct jsonValue *boolean, bool value) {
+    prepare();
     if (!boolean) {
         errorf("boolean == NULL");
         return false;
@@ -248,6 +288,7 @@ extern bool json_set_boolean(struct jsonValue *boolean, bool value) {
 }
 
 extern bool json_array_append(struct jsonValue *array, struct jsonValue *value) {
+    prepare();
     if (!array) {
         errorf("array == NULL");
         return false;
@@ -264,6 +305,7 @@ extern bool json_array_append(struct jsonValue *array, struct jsonValue *value) 
 }
 
 extern size_t json_array_size(struct jsonValue *array) {
+    prepare();
     if (!array) {
         errorf("array == NULL");
         return false;
@@ -276,6 +318,7 @@ extern size_t json_array_size(struct jsonValue *array) {
 }
 
 extern struct jsonValue *json_array_at(struct jsonValue *array, size_t index) {
+    prepare();
     if (!array) {
         errorf("array == NULL");
         return false;
@@ -288,11 +331,13 @@ extern struct jsonValue *json_array_at(struct jsonValue *array, size_t index) {
 }
 
 extern const char *json_strerror(void) {
+    check_is_initialized();
     char *error = tss_get(error_key);
     return error ? error : "";
 }
 
 extern struct jsonValue *json_parse(const char *json, bool all) {
+    prepare();
     if (!json) {
         errorf("json == NULL");
         return NULL;
@@ -305,6 +350,7 @@ extern struct jsonValue *json_parse(const char *json, bool all) {
 }
 
 struct jsonValue *json_parse_mem(const char *buffer, size_t size, bool all) {
+    prepare();
     if (!buffer) {
         errorf("buffer == NULL");
         return NULL;
@@ -317,6 +363,7 @@ struct jsonValue *json_parse_mem(const char *buffer, size_t size, bool all) {
 }
 
 extern size_t json_pretty_print(char *out, size_t size, struct jsonValue *value) {
+    prepare();
     if (!value) {
         errorf("value == NULL");
         return 0;
@@ -327,6 +374,7 @@ extern size_t json_pretty_print(char *out, size_t size, struct jsonValue *value)
 }
 
 extern size_t json_object_number_of_keys(struct jsonValue *object) {
+    prepare();
     if (!object) {
         errorf("object == NULL");
         return 0;
@@ -339,6 +387,7 @@ extern size_t json_object_number_of_keys(struct jsonValue *object) {
 }
 
 extern size_t json_object_number_of_values(struct jsonValue *object) {
+    prepare();
     if (!object) {
         errorf("object == NULL");
         return 0;
@@ -351,6 +400,7 @@ extern size_t json_object_number_of_values(struct jsonValue *object) {
 }
 
 extern bool json_object_add(struct jsonValue *object, const char *key, struct jsonValue *value) {
+    prepare();
     if (!object) {
         errorf("object == NULL");
         return false;
@@ -373,6 +423,7 @@ extern bool json_object_add(struct jsonValue *object, const char *key, struct js
 }
 
 extern size_t json_object_capacity(struct jsonValue *object) {
+    prepare();
     if (!object) {
         errorf("object == NULL");
         return 0;
@@ -385,6 +436,7 @@ extern size_t json_object_capacity(struct jsonValue *object) {
 }
 
 extern bool json_object_get_entry(struct jsonValue *object, size_t i, const char **key, struct jsonValue **value) {
+    prepare();
     if (!object) {
         errorf("object == NULL");
         return false;
@@ -407,6 +459,7 @@ extern bool json_object_get_entry(struct jsonValue *object, size_t i, const char
 
 extern struct jsonValue *
 json_object_lookup_next(struct jsonValue *object, const char *key, struct jsonValue *value) {
+    prepare();
     if (!object) {
         errorf("object == NULL");
         return NULL;
@@ -423,6 +476,7 @@ json_object_lookup_next(struct jsonValue *object, const char *key, struct jsonVa
 }
 
 extern struct jsonValue *json_object_lookup(struct jsonValue *object, const char *key) {
+    prepare();
     return json_object_lookup_next(object, key, NULL);
 }
 
@@ -489,6 +543,7 @@ fail:
 }
 
 extern struct jsonValue *json_copy(struct jsonValue *value) {
+    prepare();
     if (!value) {
         return value;
     }
@@ -603,6 +658,7 @@ end:
 
 extern bool json_are_equal(struct jsonValue *left, struct jsonValue *right,
         struct jsonValue **left_out, struct jsonValue **right_out) {
+    prepare();
     struct jsonValue *stub;
     left_diff = left_out ? left_out : &stub;
     right_diff = right_out ? right_out : &stub;

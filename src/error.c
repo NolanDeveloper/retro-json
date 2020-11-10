@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -27,6 +28,7 @@ extern void error_exit(void) {
 extern void set_error(const char *e) {
     char *error = tss_get(error_key);
     free_error(error);
+    assert(!error || !e); // errors must not be lost: set_error("error1") ... set_error("error2")
     tss_set(error_key, (char *) e);
     if (e && e != error_out_of_memory) {
         json_mem_detach((char *) e);

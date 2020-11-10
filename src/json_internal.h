@@ -89,8 +89,8 @@ struct jsonString *string_create(void);
 struct jsonString *string_create_str(const char *str);
 void string_init(struct jsonString *string);
 bool string_init_str(struct jsonString *string, const char *str);
-bool string_init_mem(struct jsonString *string, const char *mem, size_t n);
 void string_free_internal(struct jsonString *string);
+void string_free(struct jsonString *string);
 bool string_append(struct jsonString *string, char c);
 bool string_shrink(struct jsonString *string);
 unsigned string_hash(const char *str);
@@ -133,8 +133,10 @@ enum c16Type c16type(char16_t c16);
 char32_t c16pairtoc32(char16_t high, char16_t low);
 int c8len(char c);
 bool c32toc8(char32_t c32, int *n, char *c8);
-char32_t c8toc32(const char *c8);
+int c32c8len(char32_t c32);
+bool c8toc32(const char *c8, char32_t *c32);
 void c32toc16be(char32_t c32, char16_t out[2]);
+bool c32islegal(char32_t c32);
 
 extern tss_t error_key;
 

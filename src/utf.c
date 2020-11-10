@@ -28,14 +28,14 @@ extern int c8len(char c) {
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
         2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
         3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-        4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 1, 1,
+        4, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0,
     };
     return lookup_table[(unsigned char) c];
 }
@@ -68,22 +68,62 @@ extern bool c32toc8(char32_t c32, int *n, char *c8) {
     return false;
 }
 
-extern char32_t c8toc32(const char *c8) {
+extern int c32c8len(char32_t c32) {
+    if (c32 < 0x0080) {
+        return 1;
+    }
+    if (c32 < 0x0800) {
+        return 2;
+    }
+    if (c32 < 0x10000ull) {
+        return 3;
+    }
+    return 4;
+}
+
+extern bool c8toc32(const char *c8, char32_t *c32) {
     assert(c8);
-    unsigned char c = *c8++;
-    if (c <= 0x7F) {
-        return c;
+    assert(c32);
+    unsigned char c = *c8;
+    int len = c8len(c);
+    if (!len) {
+        return false;
     }
-    unsigned char c2 = *c8++;
-    if (0xC2 <= c && c <= 0xDF) {
-        return ((c & 0x1F) << 6) + (c2 & 0x3F);
+    char32_t result;
+    switch (len) {
+    case 1:
+        *c32 = c;
+        return true;
+    case 2:
+        result = c & 0x1F;
+        break;
+    case 3:
+        result = c & 0x0F;
+        break;
+    case 4:
+        result = c & 0x07;
+        break;
+    default:
+        assert(false);
     }
-    unsigned char c3 = *c8++;
-    if (0xE0 <= c && c <= 0xEF) {
-        return ((c & 0x0F) << 12) + ((c2 & 0x3F) << 6) + (c3 & 0x3F);
+    for (int i = 1; i < len; ++i) {
+        c = *++c8;
+        if ((0xC0 & c) != 0x80) {
+            errorf("invalid trailing UTF-8 byte");
+            return false;
+        }
+        result = (result << 6) + (c & 0x3F);
     }
-    unsigned char c4 = *c8;
-    return ((c & 0x07) << 18) + ((c2 & 0x3F) << 12) + ((c3 & 0x3F) << 6) + (c4 & 0x3F);
+    if (!c32islegal(result)) {
+        errorf("illegal code point");
+        return false;
+    }
+    if (c32c8len(result) < len) {
+        errorf("overlong UTF-8 sequence");
+        return false;
+    }
+    *c32 = result;
+    return true;
 }
 
 extern char32_t c16pairtoc32(char16_t high, char16_t low) {
@@ -101,4 +141,8 @@ extern void c32toc16be(char32_t c32, char16_t out[2]) {
         out[0] = 0xD800 | (c32 >> 10);
         out[1] = 0xDC00 | (c32 & 0x3FF);
     }
+}
+
+extern bool c32islegal(char32_t c32) {
+    return c32 < 0xD800 || (0xDFFF < c32 && c32 < 0x110000ull);
 }

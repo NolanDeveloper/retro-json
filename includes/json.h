@@ -97,18 +97,30 @@ struct jsonValue *json_create_null(void);
 /*!
  * \brief Retrieve value of json number.
  * \param number Json value of type JVK_NUM.
- * \param[out] value Where to put value. If \p number is NULL or is not of type JVK_NUM put NAN into \p value.
+ * \param[out] value Where to put value.
  * \returns Whether both arguments are not NULL and \p number is of type JVK_NUM.
  */
 bool json_get_number(struct jsonValue *number, double *value);
 
 /*!
- * \brief Retrieve value of json string.
+ * \brief Retrieve value of json string. 
+ * \details Returned string is always null-terminated. But json strings may include '\0' in the middle. For good
+ * interoperability user should not handle these strings as null-terminated C-strings as it may lead to unexpected
+ * truncation.
+ * \see json_get_string_length()
  * \param string Json value of type JVK_STR.
- * \param[out] value Where to put value. If \p string is NULL or is not of type JVK_STR put NULL into \p value.
+ * \param[out] value Where to put value.
  * \returns Whether both arguments are not NULL and \p string is of type JVK_STR.
  */
 bool json_get_string(struct jsonValue *string, const char **value);
+
+/*!
+ * \brief Retrieve length of json string this does not include terminating '\0'.
+ * \param string Json value of type JVK_STR.
+ * \param[out] length Where to put size.
+ * \returns Whether both arguments are not NULL and \p string is of type JVK_STR.
+ */
+bool json_get_string_length(struct jsonValue *string, size_t *length);
 
 /*!
  * \brief Retrieve value of json boolean.
@@ -208,16 +220,6 @@ size_t json_object_capacity(struct jsonValue *object);
  * \return Success of not.
  */
 bool json_object_get_entry(struct jsonValue *object, size_t i, const char **key, struct jsonValue **value);
-
-/*!
- * \brief Get value from the entry number \p i.
- * \details Some entries are empty for those NULL will be returned. use json_object_capacity() to get total number of
- * entries.
- * \param object Json value of type JVK_OBJ.
- * \param i Index of the entry.
- * \return Value of the entry with number \p i in the \p object or NULL if the entry is empty.
- */
-struct jsonValue *json_object_get_value(struct jsonValue *object, size_t i);
 
 /*!
  * \brief Find the value of the field.

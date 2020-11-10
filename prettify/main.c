@@ -51,8 +51,8 @@ int main(int argc, char ** argv) {
     }
     setvbuf(stdout, NULL, _IOFBF, 0);
     size_t size = json_pretty_print(NULL, 0, value);
-    char *buffer = malloc(size);
-    json_pretty_print(buffer, size, value);
+    char *buffer = malloc(size + 1);
+    json_pretty_print(buffer, size + 1, value);
     puts(buffer);
     free(buffer);
 finish:

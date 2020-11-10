@@ -25,8 +25,6 @@ extern void pretty_print_begin(char *out, size_t size) {
 extern size_t pretty_print_end(void) {
     if (position < out_size) {
         out_begin[position] = '\0';
-    } else {
-        ++position;
     }
     out_begin = NULL;
     return position;
@@ -50,56 +48,50 @@ static void print_indent(void) {
 static void print_json_string(struct jsonString *string) {
     assert(string);
     jprintf("\"");
-    const char * must_be_escaped =
-        "\"\\\x01\x02\x03\x04\x05\x06\x07"
-        "\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F"
-        "\x10\x11\x12\x13\x14\x15\x16\x17"
-        "\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F";
-    if (!ascii_only && !strpbrk(string->data, must_be_escaped)) {
-        jprintf("%s", string->data);
-    } else {
-        for (char c, *p = string->data; (c = *p); ++p) {
-            int n;
-            if (ascii_only && (n = c8len(c)) > 1) {
-                char16_t c16[2];
-                c32toc16be(c8toc32(p), c16);
-                jprintf("\\u%04x", c16[0]);
-                if (c16[1]) {
-                    jprintf("\\u%04x", c16[1]);
-                }
-                p += n - 1;
-                continue;
-            }
-            switch (c) {
-            case '\"':
-            case '\\':
-            case '/':
-                jprintf("\\%c", c);
-                break;
-            case '\b':
-                jprintf("\\b");
-                break;
-            case '\f':
-                jprintf("\\f");
-                break;
-            case '\n':
-                jprintf("\\n");
-                break;
-            case '\r':
-                jprintf("\\r");
-                break;
-            case '\t':
-                jprintf("\\t");
-                break;
-            default:
-                if ((unsigned char) c <= 0x1F) {
-                    jprintf("%c", c);
-                }
-                jprintf("%c", c);
-                break;
-            }
-        }
-    }
+	for (char *p = string->data, *end = string->data + string->size - 1; p != end; ++p) {
+		char c = *p;
+		int n;
+		if (ascii_only && (n = c8len(c)) > 1) {
+			char16_t c16[2];
+			char32_t c32;
+			assert(c8toc32(p, &c32));
+			c32toc16be(c32, c16);
+			jprintf("\\u%04x", c16[0]);
+			if (c16[1]) {
+				jprintf("\\u%04x", c16[1]);
+			}
+			p += n - 1;
+			continue;
+		}
+		switch (c) {
+		case '\"':
+		case '\\':
+			jprintf("\\%c", c);
+			break;
+		case '\b':
+			jprintf("\\b");
+			break;
+		case '\f':
+			jprintf("\\f");
+			break;
+		case '\n':
+			jprintf("\\n");
+			break;
+		case '\r':
+			jprintf("\\r");
+			break;
+		case '\t':
+			jprintf("\\t");
+			break;
+		default:
+			if ((unsigned char) c < 0x20) {
+				jprintf("\\u%04x", (unsigned char) c);
+			} else {
+				jprintf("%c", c);
+			}
+			break;
+		}
+	}
     jprintf("\"");
 }
 
@@ -111,12 +103,12 @@ static void print_json_number(double number) {
     if (isinf(number) == 1) {
         number = DBL_MAX;
     } else if (isinf(number) == -1) {
-        number = DBL_MIN;
+        number = -DBL_MAX;
     }
-    if ((long) number == number) {
-        jprintf("%ld", (long) number);
+    if (number == (long long) number) {
+        jprintf("%lld", (long long) number);
     } else {
-        jprintf("%f", number);
+        jprintf("%.16g", number);
     }
 }
 

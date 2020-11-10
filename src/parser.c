@@ -112,8 +112,9 @@ static bool parse_string(struct jsonString *string) {
     if (!consume("\"")) {
         return false;
     }
-    while (1) {
-        int c;
+    while (true) {
+        int c, len;
+        char32_t c32;
         switch (c = next_char()) {
         case EOF:
             errorf("unexpected end of input");
@@ -169,14 +170,21 @@ static bool parse_string(struct jsonString *string) {
                     return false;
                 }
                 enum c16Type type = c16type((char16_t) p);
-                size_t prev_offset = offset;
-                if (type == UTF16_SURROGATE_HIGH && consume_optionally("\\u")) {
+                if (type == UTF16_SURROGATE_LOW) {
+                    errorf("bad Unicode escape sequence");
+                    return false;
+                }
+                if (type == UTF16_SURROGATE_HIGH) {
+                    if (!consume("\\u")) {
+                        return false;
+                    }
                     char32_t next = 0;
                     if (!parse_hex4(&next)) {
                         return false;
                     }
                     if (c16type(next) != UTF16_SURROGATE_LOW) {
-                        offset = prev_offset;
+                        errorf("bad Unicode escape sequence");
+                        return false;
                     } else {
                         p = c16pairtoc32(p, next);
                     }
@@ -192,11 +200,24 @@ static bool parse_string(struct jsonString *string) {
             }
             break;
         default:
-            if ((unsigned char) c <= 0x1F) {
+            if ((unsigned char) c < 0x20) {
                 errorf("unescaped control character");
                 return false;
             }
+            len = c8len(c);
+            if (!len || input_buffer_size - offset < (size_t) len) {
+                errorf("ill-formed UTF-8");
+                return false;
+            }
+            if (!c8toc32(&input_buffer[offset - 1], &c32)) {
+                return false;
+            }
             string_append(string, c);
+            for (int i = 1; i < len; ++i) {
+                if (!string_append(string, next_char())) {
+                    return false;
+                }
+            }
             break;
         }
     }
@@ -212,7 +233,7 @@ static bool parse_object(struct jsonObject *object) {
     if (consume_optionally("}")) {
         return true;
     }
-    while (1) {
+    while (true) {
         key = string_create();
         if (!key) {
             goto fail;
@@ -244,8 +265,7 @@ static bool parse_object(struct jsonObject *object) {
     }
     assert(false);
 fail:
-    string_free_internal(key);
-    json_free(key);
+    string_free(key);
     json_value_free(value);
     object_free_internal(object);
     return false;
@@ -431,11 +451,14 @@ static bool parse_value_number(struct jsonValue *value) {
     if (!number_append('\0')) {
         return false;
     }
-    int match = 0;
-    int n = sscanf(number_buffer, "%lf%n", &value->v.number, &match);
+    int n = sscanf(number_buffer, "%lf", &value->v.number);
     if (1 != n) {
         errorf("failed to parse number");
         return false;
+    }
+    // eliminates negative zero
+    if (value->v.number == 0.0) {
+        value->v.number = 0.0;
     }
     return true;
 }
@@ -486,7 +509,7 @@ static struct jsonValue *parse_value(void) {
         result = parse_value_number(value);
         break;
     default:
-        errorf("json value was expected");
+        errorf("unexpected character");
         result = false;
         break;
     }

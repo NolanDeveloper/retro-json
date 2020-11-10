@@ -159,6 +159,24 @@ extern bool json_get_string(struct jsonValue *string, const char **value) {
     return true;
 }
 
+extern bool json_get_string_length(struct jsonValue *string, size_t *length) {
+    if (!length) {
+        errorf("length == NULL");
+        return false;
+    }
+    if (!string) {
+        errorf("string == NULL");
+        *length = 0;
+        return false;
+    }
+    if (string->kind != JVK_STR) {
+        errorf("argument is not json string");
+        *length = 0;
+        return false;
+    }
+    return string->v.string.size - 1;
+}
+
 extern bool json_get_boolean(struct jsonValue *boolean, bool *value) {
     if (!value) {
         errorf("value == NULL");
@@ -510,7 +528,7 @@ static bool objects_are_equal(struct jsonObject *left, struct jsonObject *right)
         }
         struct jsonValue *right_value = NULL;
         do {
-            right_value = object_next(right, key->data, NULL);
+            right_value = object_next(right, key->data, right_value);
         } while (right_value && !are_equal(value, right_value));
         if (!right_value) {
             *left_diff = value;

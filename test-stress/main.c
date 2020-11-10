@@ -8,7 +8,7 @@
 #include "json.h"
 #include "json_internal.h"
 
-#define REPEATS 10000
+#define REPEATS 1000
 #define JSON_SIZE 30
 #define JSON_OBJARR_SIZE 3
 #define JSON_STR_SIZE 20 /* number of unicode code points */
@@ -108,11 +108,12 @@ static char json_str_parsed_buffer[100 * 1024];
 #define GREEN "\x1B[32m"
 #define RESET "\x1B[0m"
 
-int main(int argc, char * argv[]) {
-    struct jsonValue * json, * json_parsed;
+int main(int argc, char *argv[]) {
+    struct jsonValue *json, *json_parsed;
     int i;
     (void) argc;
     (void) argv;
+    json_init();
     srand(42);
     for (i = 0; i < REPEATS; ++i) {
         json = generate_json(JSON_SIZE);
@@ -142,6 +143,7 @@ int main(int argc, char * argv[]) {
         }
 #endif
     }
+    json_exit();
     printf(GREEN "STRESS TEST PASSED\n" RESET);
     return EXIT_SUCCESS;
 }

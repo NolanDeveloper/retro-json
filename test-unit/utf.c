@@ -34,14 +34,14 @@ static bool test_c16pairtoc32(void) {
 static bool test_c8len(void) {
     ASSERT(1 == c8len('\x00'));
     ASSERT(1 == c8len('\x7F'));
-    ASSERT(1 == c8len('\x80'));
-    ASSERT(1 == c8len('\xBF'));
+    ASSERT(0 == c8len('\x80'));
+    ASSERT(0 == c8len('\xBF'));
     ASSERT(2 == c8len('\xC0'));
     ASSERT(2 == c8len('\xDF'));
     ASSERT(3 == c8len('\xE0'));
     ASSERT(3 == c8len('\xEF'));
     ASSERT(4 == c8len('\xF7'));
-    ASSERT(1 == c8len('\xFF'));
+    ASSERT(0 == c8len('\xFF'));
     return true;
 }
 
@@ -73,22 +73,27 @@ static bool test_c32toc8(void) {
 
 static bool test_c8toc32(void) {
     char c8[4] = { 0 };
+    char32_t c32;
     for (int i = 0; i < 128; ++i) {
         c8[0] = i;
-        ASSERT((char32_t) i == c8toc32(c8));
+        ASSERT(c8toc32(c8, &c32));
+        ASSERT((char32_t) i == c32);
     }
     c8[0] = '\xDE';
     c8[1] = '\xA5';
-    ASSERT(0x07A5 == c8toc32(c8));
+    ASSERT(c8toc32(c8, &c32));
+    ASSERT(0x07A5 == c32);
     c8[0] = '\xEF';
     c8[1] = '\xBC';
     c8[2] = '\x91';
-    ASSERT(0xFF11 == c8toc32(c8));
+    ASSERT(c8toc32(c8, &c32));
+    ASSERT(0xFF11 == c32);
     c8[0] = '\xF0';
     c8[1] = '\x9F';
     c8[2] = '\xA4';
     c8[3] = '\xA3';
-    ASSERT(0x1F923 == c8toc32(c8));
+    ASSERT(c8toc32(c8, &c32));
+    ASSERT(0x1F923 == c32);
     return true;
 }
 

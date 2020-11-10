@@ -46,20 +46,6 @@ extern bool string_init_str(struct jsonString *string, const char *str) {
     return true;
 }
 
-extern bool string_init_mem(struct jsonString *string, const char *mem, size_t n) {
-    assert(string);
-    assert(mem);
-    string->size = string->capacity = n + 1;
-    string->data = json_malloc(string->size);
-    if (!string->data) {
-        return false;
-    }
-    memcpy(string->data, mem, n);
-    string->data[n] = '\0';
-    string->hash = string_hash(string->data);
-    return true;
-}
-
 extern void string_free_internal(struct jsonString *string) {
     if (!string) {
         return;
@@ -69,6 +55,13 @@ extern void string_free_internal(struct jsonString *string) {
     string->size = 0;
     string->data = NULL;
     string->hash = FNV_OFFSET_BASIS;
+}
+
+extern void string_free(struct jsonString *string) {
+    if (string) {
+        string_free_internal(string);
+    }
+    json_free(string);
 }
 
 static bool string_reserve(struct jsonString *string, size_t min_capacity) {
@@ -116,8 +109,10 @@ extern unsigned string_hash(const char *str) {
     if (!str) {
         return n;
     }
+    char c;
     do {
-        n = (n ^ *str) * FNV_PRIME;
-    } while (*str++);
+        c = *str++;
+        n = (n ^ c) * FNV_PRIME;
+    } while (c);
     return n;
 }

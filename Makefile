@@ -22,7 +22,7 @@ LDLIBS     += -lpthread
 CPPFLAGS   += -I includes
 CPPFLAGS   += -I src
 
-BUILD_DIR  := $(shell mkdir -p "build-$(MODE)" ; echo build-$(MODE) ; )
+BUILD_DIR  := $(shell mkdir -p "build-$(MODE)" ; echo ./build-$(MODE) ; )
 
 LIBRARY_A  := $(BUILD_DIR)/libretrojson.a
 LIBRARY_SO := $(BUILD_DIR)/libretrojson.so
@@ -76,7 +76,15 @@ tests: $(TEST_APPS)
 check: tests 
 	$(TEST_STRESS)
 	$(TEST_UNIT)
-	$(TEST_COMPLIANCE) ./test-compliance/JSONTestSuite/*
+	for i in $$(ls ./test-compliance/JSONTestSuite) ;\
+	do \
+		if [ -f ./test-compliance/pretty/$$i ] ;\
+		then \
+			$(TEST_COMPLIANCE) ./test-compliance/JSONTestSuite/$$i ./test-compliance/pretty/$$i ;\
+		else \
+			$(TEST_COMPLIANCE) ./test-compliance/JSONTestSuite/$$i ;\
+		fi || exit 2 ;\
+	done
 
 .PHONY: clean
 clean:

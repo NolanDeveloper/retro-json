@@ -74,11 +74,13 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
     json_value_free(json);
+#ifndef RELEASE
     if (!dbg_is_memory_clear()) {
         printf(RED "MEMORY LEAK" RESET " '%s'\n", filename);
         dbg_print_blocks();
         return EXIT_FAILURE;
     }
+#endif
     json_exit();
     printf(GREEN "TEST PASSED" RESET " '%s'\n", filename);
     return EXIT_SUCCESS;

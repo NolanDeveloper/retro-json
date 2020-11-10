@@ -1,37 +1,19 @@
 # or debug
-MODE       ?= release
-
-ifeq "$(MODE)" "debug"
-	CFLAGS += -g
-	CFLAGS += -O0
-else
-	CFLAGS   += -O2
-	CPPFLAGS += -DRELEASE
-endif
-
-CFLAGS     += -std=c11
-CFLAGS     += -pedantic
-CFLAGS     += -Wall
-CFLAGS     += -Wextra
-CFLAGS     += -Werror
-CFLAGS     += -Wstrict-prototypes
-CFLAGS     += -fPIC
-
-LDLIBS     += -lpthread
-
-CPPFLAGS   += -I includes
-CPPFLAGS   += -I src
-
-BUILD_DIR  := $(shell mkdir -p "build-$(MODE)" ; echo ./build-$(MODE) ; )
-
-LIBRARY_A  := $(BUILD_DIR)/libretrojson.a
+MODE ?= release
+CFLAGS := -std=c11 -pedantic -Wall -Wextra\
+	-Werror -Wstrict-prototypes -fPIC\
+	$(if $(filter debug,$(MODE)),-g -O0,-O2)
+LDLIBS := -lpthread
+CPPFLAGS := -I includes -I src $(if $(filter debug,$(MODE)),,-DRELEASE)
+BUILD_DIR := $(shell mkdir -p "build-$(MODE)" ; echo ./build-$(MODE) ; )
+LIBRARY_A := $(BUILD_DIR)/libretrojson.a
 LIBRARY_SO := $(BUILD_DIR)/libretrojson.so
-PRETTIFY   := $(BUILD_DIR)/prettify/a.out
-TEST_STRESS     := $(BUILD_DIR)/test-stress/a.out
-TEST_UNIT       := $(BUILD_DIR)/test-unit/a.out
+PRETTIFY := $(BUILD_DIR)/prettify/a.out
+TEST_STRESS := $(BUILD_DIR)/test-stress/a.out
+TEST_UNIT := $(BUILD_DIR)/test-unit/a.out
 TEST_COMPLIANCE := $(BUILD_DIR)/test-compliance/a.out
-TEST_APPS  := $(TEST_STRESS) $(TEST_UNIT) $(TEST_COMPLIANCE)
-APPS       := $(PRETTIFY) $(TEST_APPS)
+TEST_APPS := $(TEST_STRESS) $(TEST_UNIT) $(TEST_COMPLIANCE)
+APPS := $(PRETTIFY) $(TEST_APPS)
 
 .PHONY: all
 all: $(LIBRARY_A) $(LIBRARY_SO) $(PRETTIFY)
@@ -45,7 +27,6 @@ $(patsubst %.c, $(BUILD_DIR)/%.o, $(CFILES)): $(BUILD_DIR)/%.o: %.c
 	@$(CC) $(CFLAGS) -c $< $(CPPFLAGS) -MT $@ -MM -MF $(BUILD_DIR)/$*.dep
 
 # application compilation rule
-# applications are all directories with main.c
 
 .SECONDEXPANSION:
 $(APPS): $(BUILD_DIR)/%/a.out: \

@@ -1,4 +1,4 @@
-#include "tests.h"
+#include "unit_tests.h"
 
 #include "json_internal.h"
 

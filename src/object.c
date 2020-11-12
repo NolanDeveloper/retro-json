@@ -49,11 +49,11 @@ extern void object_free_internal(struct jsonObject *object) {
         }
         assert(entry->value);
         string_free_internal(entry->key);
-        json_free(entry->key);
+        free(entry->key);
         assert(entry->value);
         json_value_free(entry->value);
     }
-    json_free(object->entries);
+    free(object->entries);
     object->capacity = 0;
     object->size = 0;
     object->entries = NULL;
@@ -74,7 +74,7 @@ extern bool object_reserve(struct jsonObject *object, size_t size) {
             break;
         }
     }
-    struct jsonObjectEntry *new_entries = json_calloc(new_capacity * sizeof(struct jsonObjectEntry));
+    struct jsonObjectEntry *new_entries = calloc(new_capacity, sizeof(struct jsonObjectEntry));
     if (!new_entries) {
         return false;
     }
@@ -93,7 +93,7 @@ extern bool object_reserve(struct jsonObject *object, size_t size) {
         entry->key = NULL;
         entry->value = NULL;
     }
-    json_free(old_entries);
+    free(old_entries);
     return true;
 }
 

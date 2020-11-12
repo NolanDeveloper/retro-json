@@ -12,7 +12,7 @@ static void free_error(void *error) {
     if (!error || error == error_out_of_memory) {
         return;
     }
-    json_free(error);
+    free(error);
 }
 
 extern bool error_init(void) {
@@ -30,9 +30,6 @@ extern void set_error(const char *e) {
     free_error(error);
     assert(!error || !e); // errors must not be lost: set_error("error1") ... set_error("error2")
     tss_set(error_key, (char *) e);
-    if (e && e != error_out_of_memory) {
-        json_mem_detach((char *) e);
-    }
 }
 
 static char *vasprintf(const char *fmt, va_list args) {
@@ -43,13 +40,13 @@ static char *vasprintf(const char *fmt, va_list args) {
     if (n < 0) {
         return NULL;
     }
-    char *text = json_malloc(n + 1);
+    char *text = malloc(n + 1);
     if (!text) {
         return NULL;
     }
     n = vsnprintf(text, n + 1, fmt, args);
     if (n < 0) {
-        json_free(text);
+        free(text);
         return NULL;
     }
     return text;
@@ -73,6 +70,6 @@ extern void errorf(const char *fmt, ...) {
         return;
     }
     set_error(asprintf("at %u:%u %s", line, column, message));
-    json_free(message);
+    free(message);
 }
 

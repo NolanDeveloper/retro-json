@@ -69,12 +69,12 @@ extern void json_value_free(struct jsonValue *value) {
         return;
     }
     value_free_internal(value);
-    json_free(value);
+    free(value);
 }
 
 extern struct jsonValue *json_create_number(double number) {
     prepare();
-    struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
+    struct jsonValue *json = malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
@@ -89,13 +89,13 @@ extern struct jsonValue *json_create_string(const char *string) {
         errorf("string == NULL");
         return NULL;
     }
-    struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
+    struct jsonValue *json = malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
     json->kind = JVK_STR;
     if (!string_init_str(&json->v.string, string)) {
-        json_free(json);
+        free(json);
         return NULL;
     }
     return json;
@@ -103,7 +103,7 @@ extern struct jsonValue *json_create_string(const char *string) {
 
 extern struct jsonValue *json_create_object(size_t initial_capacity) {
     prepare();
-    struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
+    struct jsonValue *json = malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
@@ -111,7 +111,7 @@ extern struct jsonValue *json_create_object(size_t initial_capacity) {
     object_init(&json->v.object);
     if (!object_reserve(&json->v.object, initial_capacity)) {
         object_free_internal(&json->v.object);
-        json_free(json);
+        free(json);
         return NULL;
     }
     return json;
@@ -119,7 +119,7 @@ extern struct jsonValue *json_create_object(size_t initial_capacity) {
 
 extern struct jsonValue *json_create_array(size_t initial_capacity) {
     prepare();
-    struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
+    struct jsonValue *json = malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
@@ -127,7 +127,7 @@ extern struct jsonValue *json_create_array(size_t initial_capacity) {
     array_init(&json->v.array);
     if (!array_reserve(&json->v.array, initial_capacity)) {
         array_free_internal(&json->v.array);
-        json_free(json);
+        free(json);
         return NULL;
     }
     return json;
@@ -135,7 +135,7 @@ extern struct jsonValue *json_create_array(size_t initial_capacity) {
 
 extern struct jsonValue *json_create_boolean(bool boolean) {
     prepare();
-    struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
+    struct jsonValue *json = malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
@@ -146,7 +146,7 @@ extern struct jsonValue *json_create_boolean(bool boolean) {
 
 extern struct jsonValue *json_create_null(void) {
     prepare();
-    struct jsonValue *json = json_malloc(sizeof(struct jsonValue));
+    struct jsonValue *json = malloc(sizeof(struct jsonValue));
     if (!json) {
         return NULL;
     }
@@ -513,7 +513,7 @@ static struct jsonValue *duplicate_object(struct jsonObject *object) {
     return copy;
 fail:
     string_free_internal(key_copy);
-    json_free(copy);
+    free(copy);
     return NULL;
 }
 
@@ -538,7 +538,7 @@ static struct jsonValue *duplicate_array(struct jsonArray *array) {
     }
     return copy;
 fail:
-    json_free(value_copy);
+    free(value_copy);
     return NULL;
 }
 

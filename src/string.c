@@ -10,7 +10,7 @@
 #define FNV_PRIME           16777619u
 
 extern struct jsonString *string_create(void) {
-    struct jsonString *string = json_malloc(sizeof(struct jsonString));
+    struct jsonString *string = malloc(sizeof(struct jsonString));
     if (string) {
         string_init(string);
     }
@@ -18,7 +18,7 @@ extern struct jsonString *string_create(void) {
 }
 
 extern struct jsonString *string_create_str(const char *str) {
-    struct jsonString *string = json_malloc(sizeof(struct jsonString));
+    struct jsonString *string = malloc(sizeof(struct jsonString));
     if (string) {
         string_init_str(string, str);
     }
@@ -37,7 +37,7 @@ extern bool string_init_str(struct jsonString *string, const char *str) {
     assert(string);
     assert(str);
     string->size = string->capacity = strlen(str) + 1;
-    string->data = json_malloc(string->size);
+    string->data = malloc(string->size);
     if (!string->data) {
         return false;
     }
@@ -50,7 +50,7 @@ extern void string_free_internal(struct jsonString *string) {
     if (!string) {
         return;
     }
-    json_free(string->data);
+    free(string->data);
     string->capacity = 0;
     string->size = 0;
     string->data = NULL;
@@ -61,7 +61,7 @@ extern void string_free(struct jsonString *string) {
     if (string) {
         string_free_internal(string);
     }
-    json_free(string);
+    free(string);
 }
 
 static bool string_reserve(struct jsonString *string, size_t min_capacity) {
@@ -73,7 +73,7 @@ static bool string_reserve(struct jsonString *string, size_t min_capacity) {
     do {
         new_capacity *= 2;
     } while (new_capacity < min_capacity);
-    string->data = json_realloc(string->data, new_capacity);
+    string->data = realloc(string->data, new_capacity);
     if (!string->data) {
         return false;
     }
@@ -97,7 +97,7 @@ extern bool string_shrink(struct jsonString *string) {
         return true;
     }
     assert(string->size);
-    void *new_data = json_realloc(string->data, string->size);
+    void *new_data = realloc(string->data, string->size);
     if (new_data) {
         string->data = new_data;
     }

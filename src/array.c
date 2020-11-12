@@ -26,7 +26,7 @@ extern void array_free_internal(struct jsonArray *array) {
     for (size_t i = 0; i < array->size; ++i) {
         json_value_free(array->values[i]);
     }
-    json_free(array->values);
+    free(array->values);
     array->size = 0;
     array->capacity = 0;
     array->values = NULL;
@@ -38,7 +38,7 @@ extern bool array_reserve(struct jsonArray *array, size_t new_capacity) {
     if (new_capacity <= array->capacity) {
         return true;
     }
-    struct jsonValue **new_values = json_realloc(array->values, new_capacity * sizeof(struct jsonValue *));
+    struct jsonValue **new_values = realloc(array->values, new_capacity * sizeof(struct jsonValue *));
     if (!new_values) {
         return false;
     }

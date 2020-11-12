@@ -1,21 +1,9 @@
-# build and doc directories
-build-*
+build*
 doc
 
-# all hidden files
+*.o
+*.dep
+
 .*
-# except .gitignore
 !.gitignore
 !.github
-
-# QT creator files
-*.cflags
-*.config
-*.creator
-*.creator.user
-*.cxxflags
-*.files
-*.includes
-
-# compilation database file
-compile_commands.json

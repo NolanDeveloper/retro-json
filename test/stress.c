@@ -5,7 +5,6 @@
 #include <threads.h>
 #include <uchar.h>
 
-#include "json.h"
 #include "json_internal.h"
 
 #define REPEATS 1000
@@ -108,17 +107,12 @@ static char json_str_parsed_buffer[100 * 1024];
 #define GREEN "\x1B[32m"
 #define RESET "\x1B[0m"
 
-int main(int argc, char *argv[]) {
-    struct jsonValue *json, *json_parsed;
-    int i;
-    (void) argc;
-    (void) argv;
-    json_init();
+extern bool test_stress(void) {
     srand(42);
-    for (i = 0; i < REPEATS; ++i) {
-        json = generate_json(JSON_SIZE);
+    for (int i = 0; i < REPEATS; ++i) {
+        struct jsonValue *json = generate_json(JSON_SIZE);
         json_pretty_print(json_str_buffer, sizeof(json_str_buffer), json);
-        json_parsed = json_parse(json_str_buffer, true);
+        struct jsonValue *json_parsed = json_parse(json_str_buffer, true);
         //! @todo Show path to the first different node
         if (!json_are_equal(json, json_parsed, NULL, NULL)) {
             json_pretty_print(json_str_parsed_buffer, sizeof(json_str_parsed_buffer), json_parsed);
@@ -129,22 +123,12 @@ int main(int argc, char *argv[]) {
             printf("========================================\n");
             printf("%s\n", json_str_parsed_buffer);
             printf("========================================\n");
-            return EXIT_FAILURE;
+            return false;
         }
         json_value_free(json_parsed);
         json_value_free(json);
-#ifndef RELEASE
-        if (!dbg_is_memory_clear()) {
-            printf(RED "STRESS TEST FAILED\n" RESET);
-            printf("Attempt #%d\n", i);
-            printf("There was a memory leak.\n");
-            dbg_print_blocks();
-            return EXIT_FAILURE;
-        }
-#endif
     }
-    json_exit();
     printf(GREEN "STRESS TEST PASSED\n" RESET);
-    return EXIT_SUCCESS;
+    return true;
 }
 

@@ -469,7 +469,7 @@ static struct jsonValue *parse_value(void) {
         errorf("recursion depth exceeded");
         return NULL;
     }
-    struct jsonValue *value = json_malloc(sizeof(struct jsonValue));
+    struct jsonValue *value = malloc(sizeof(struct jsonValue));
     if (!value) {
         return NULL;
     }
@@ -515,7 +515,7 @@ static struct jsonValue *parse_value(void) {
     }
     --depth;
     if (!result) {
-        json_free(value);
+        free(value);
         value = NULL;
     }
     return value;

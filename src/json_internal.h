@@ -7,32 +7,6 @@
 #include <threads.h>
 #include <uchar.h>
 
-#ifndef RELEASE
-
-void *dbg_malloc(size_t size, const char *file, int line);
-void *dbg_calloc(size_t size, const char *file, int line);
-void *dbg_realloc(void *ptr, size_t size, const char *file, int line);
-void dbg_free(void *ptr, const char *file, int line);
-void dbg_mem_detach(void *ptr, const char *file, int line);
-bool dbg_is_memory_clear(void);
-void dbg_print_blocks(void);
-
-#define json_malloc(size)        dbg_malloc(size, __FILE__, __LINE__)
-#define json_calloc(size)        dbg_calloc(size, __FILE__, __LINE__)
-#define json_realloc(ptr, size)  dbg_realloc(ptr, size, __FILE__, __LINE__)
-#define json_free(ptr)           dbg_free(ptr, __FILE__, __LINE__)
-#define json_mem_detach(ptr)     dbg_mem_detach(ptr, __FILE__, __LINE__)
-
-#else
-
-#define json_malloc(size)        json_malloc_(size)
-#define json_calloc(size)        json_calloc_(size)
-#define json_realloc(ptr, size)  json_realloc_(ptr, size)
-#define json_free(ptr)           json_free_(ptr)
-#define json_mem_detach(ptr)
-
-#endif
-
 // Assertion that's computationally hard to evaluate.  This might be used to
 // check complex invariants.
 #ifndef RELEASE
@@ -80,7 +54,7 @@ struct jsonValue {
     } v;
 };
 
-void *json_malloc_(size_t size);
+void *malloc_(size_t size);
 void *json_calloc_(size_t size);
 void *json_realloc_(void *ptr, size_t size);
 void json_free_(void *ptr);

@@ -1,4 +1,4 @@
-build*
+build/*
 doc
 
 *.o
@@ -6,5 +6,6 @@ doc
 
 .*
 !.gitignore
+!.gitkeep
 !.github
 !.logo.png

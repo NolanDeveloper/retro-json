@@ -18,7 +18,7 @@ static bool read_file(const char *filename, char **bytes, size_t *size) {
     fseek(f, 0, SEEK_SET);
     *bytes = malloc(*size + 1);
     assert(*bytes);
-    int n = fread(*bytes, 1, *size, f);
+    size_t n = fread(*bytes, 1, *size, f);
     assert(n == *size);
     fclose(f);
     (*bytes)[*size] = '\0';

@@ -46,6 +46,10 @@ check: tests
 leakcheck: tests
 	valgrind --error-exitcode=1 --leak-check=full ./build/test
 
+.PHONY:
+doc:
+	doxygen 
+
 .PHONY: clean
 clean:
 	$(RM) -- $(wildcard src/*.o) 
@@ -53,6 +57,7 @@ clean:
 	$(RM) -- $(wildcard src/*.dep) 
 	$(RM) -- $(wildcard test/*.dep)
 	$(RM) -- $(wildcard build/*)
+	$(RM) -r doc
 
 -include $(wildcard src/*.dep)
 -include $(wildcard test/*.dep)

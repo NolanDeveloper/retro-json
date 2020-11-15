@@ -35,7 +35,7 @@ void json_exit(void);
  */
 enum jsonValueKind {
     JVK_STR, //!< string
-    JVK_NUM, //!< number (we don't discriminate between integers and floats)
+    JVK_NUM, //!< number
     JVK_OBJ, //!< object
     JVK_ARR, //!< array
     JVK_BOOL, //!< "true" or "false"
